@@ -38,10 +38,12 @@ from .const import (
     CONF_WEB_INTERVAL,
     DEFAULT_WEB_INTERVAL_MINUTES,
     DOMAIN,
+    GEN2,
     GEN3,
     LOGGER,
     MAX_WEB_INTERVAL_MINUTES,
     MIN_WEB_INTERVAL_MINUTES,
+    NCAPI_PROBE_TIMEOUT,
 )
 from .coordinator import EsceaConfigEntry
 from .transport import async_discover_fireplaces, async_identify
@@ -61,6 +63,7 @@ class EsceaConfigFlow(ConfigFlow, domain=DOMAIN):
     def __init__(self) -> None:
         self._found: dict[str, DiscoveredFireplace] = {}
         self._fire: DiscoveredFireplace | None = None
+        self._g3: tuple[str, NcapiStatus] | None = None
         self._mac: str | None = None
 
     @staticmethod
@@ -68,6 +71,12 @@ class EsceaConfigFlow(ConfigFlow, domain=DOMAIN):
     def async_get_options_flow(entry: EsceaConfigEntry) -> EsceaOptionsFlow:
         """Return the options flow."""
         return EsceaOptionsFlow()
+
+    @classmethod
+    @callback
+    def async_supports_options_flow(cls, entry: EsceaConfigEntry) -> bool:
+        """Only Ethernet fires have a web page to configure."""
+        return entry.data.get(CONF_GENERATION, GEN2) == GEN2
 
     # Adding by hand -------------------------------------------------------
 
@@ -114,7 +123,9 @@ class EsceaConfigFlow(ConfigFlow, domain=DOMAIN):
 
     async def _async_probe_g3(self, host: str) -> NcapiStatus | None:
         """Return the status if the address is a Generation 3 (Wi-Fi) fire."""
-        status = await async_probe(async_get_clientsession(self.hass), host)
+        status = await async_probe(
+            async_get_clientsession(self.hass), host, timeout=NCAPI_PROBE_TIMEOUT
+        )
         if status is None or not status.serial:
             return None
         return status
@@ -128,10 +139,14 @@ class EsceaConfigFlow(ConfigFlow, domain=DOMAIN):
         serial: int | str = (
             int(status.serial) if status.serial.isdigit() else status.serial
         )
-        return self.async_create_entry(
-            title=f"Escea {serial}",
-            data={CONF_HOST: host, CONF_SERIAL: serial, CONF_GENERATION: GEN3},
-        )
+        data: dict[str, Any] = {
+            CONF_HOST: host,
+            CONF_SERIAL: serial,
+            CONF_GENERATION: GEN3,
+        }
+        if self._mac:
+            data[CONF_MAC] = self._mac
+        return self.async_create_entry(title=f"Escea {serial}", data=data)
 
     async def async_step_pick(
         self, user_input: dict[str, Any] | None = None
@@ -167,8 +182,19 @@ class EsceaConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_dhcp(
         self, discovery_info: DhcpServiceInfo
     ) -> ConfigFlowResult:
-        """A device with an Escea MAC address joined the network."""
+        """A device with an Escea MAC address joined the network.
+
+        Wi-Fi fires answer the NCAPI; Ethernet fires answer UDP.
+        """
         self._mac = format_mac(discovery_info.macaddress)
+        if (g3 := await self._async_probe_g3(discovery_info.ip)) is not None:
+            await self.async_set_unique_id(g3.serial)
+            self._abort_if_unique_id_configured(
+                updates={CONF_HOST: discovery_info.ip, CONF_MAC: self._mac}
+            )
+            self._g3 = (discovery_info.ip, g3)
+            self.context["title_placeholders"] = {"name": f"Escea {g3.serial}"}
+            return await self.async_step_confirm()
         try:
             fire = await async_identify(self.hass, discovery_info.ip)
         except EsceaError:
@@ -185,16 +211,20 @@ class EsceaConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Confirm a discovered fireplace."""
-        assert self._fire is not None
-        if user_input is not None:
-            return await self.async_step_web()
+        if self._g3 is not None:
+            host, status = self._g3
+            if user_input is not None:
+                return await self._async_create_g3(host, status)
+            name, shown_host = f"Escea {status.serial}", host
+        else:
+            assert self._fire is not None
+            if user_input is not None:
+                return await self.async_step_web()
+            name, shown_host = _title(self._fire.serial), self._fire.host
         self._set_confirm_only()
         return self.async_show_form(
             step_id="confirm",
-            description_placeholders={
-                "name": _title(self._fire.serial),
-                "host": self._fire.host,
-            },
+            description_placeholders={"name": name, "host": shown_host},
         )
 
     # Web page login ---------------------------------------------------------

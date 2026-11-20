@@ -28,6 +28,7 @@ from aioescea import (
     Timer,
     async_find,
     mode_from_status,
+    round_half_up,
 )
 
 from homeassistant.config_entries import ConfigEntry
@@ -126,6 +127,7 @@ class EsceaCoordinator(DataUpdateCoordinator[EsceaData]):
         self._pending: dict[str, Any] = {}
         self._pending_power: bool | None = None
         self._ready_unsub: CALLBACK_TYPE | None = None
+        self._web_running = False
 
     @classmethod
     async def async_create(
@@ -197,12 +199,21 @@ class EsceaCoordinator(DataUpdateCoordinator[EsceaData]):
             status = self.fireplace.last_status or status
 
         if self.web_enabled and dt_util.utcnow() >= self._web_next:
-            await self._async_update_web()
+            if self.data is None:
+                # First refresh: read it now so the web entities start filled.
+                await self._async_update_web()
+            elif not self._web_running:
+                # Afterwards, read it in the background. The page can take
+                # 10 s or more to answer, and a command's refresh shouldn't
+                # wait for it.
+                self._web_running = True
+                self.config_entry.async_create_background_task(
+                    self.hass,
+                    self._async_update_web_and_publish(),
+                    f"{DOMAIN} {self.serial} web page",
+                )
 
-        web_fresh = (
-            self._web_last_ok is not None
-            and dt_util.utcnow() - self._web_last_ok < WEB_STALE_AFTER
-        )
+        web_fresh = self._web_is_fresh()
         return EsceaData(
             status=status,
             busy_remaining=self.fireplace.busy_remaining,
@@ -238,6 +249,28 @@ class EsceaCoordinator(DataUpdateCoordinator[EsceaData]):
         self.hass.config_entries.async_update_entry(
             self.config_entry, data={**self.config_entry.data, CONF_HOST: host}
         )
+
+    def _web_is_fresh(self) -> bool:
+        return (
+            self._web_last_ok is not None
+            and dt_util.utcnow() - self._web_last_ok < WEB_STALE_AFTER
+        )
+
+    async def _async_update_web_and_publish(self) -> None:
+        """Read the web page, then update the entities with what was read."""
+        try:
+            await self._async_update_web()
+        finally:
+            self._web_running = False
+        if self.data is not None:
+            self.async_set_updated_data(
+                replace(
+                    self.data,
+                    home_page=self._home_page,
+                    diagnostics=self._diagnostics,
+                    web_fresh=self._web_is_fresh(),
+                )
+            )
 
     async def _async_update_web(self) -> None:
         """Read the web page, backing off hard if it struggles."""
@@ -349,7 +382,7 @@ class EsceaCoordinator(DataUpdateCoordinator[EsceaData]):
                 lambda: self.fireplace.async_set_temperature(temperature)
             )
         except EsceaBusyError:
-            self._hold("temperature", round(temperature))
+            self._hold("temperature", round_half_up(temperature))
             return
         await self.async_refresh()
 

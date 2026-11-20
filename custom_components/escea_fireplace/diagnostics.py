@@ -12,7 +12,15 @@ from homeassistant.core import HomeAssistant
 from .const import CONF_MAC, CONF_PIN, CONF_SERIAL
 from .coordinator import EsceaConfigEntry
 
-TO_REDACT = {CONF_PASSWORD, CONF_USERNAME, CONF_PIN, CONF_SERIAL, CONF_MAC}
+TO_REDACT = {
+    CONF_PASSWORD,
+    CONF_USERNAME,
+    CONF_PIN,
+    CONF_SERIAL,
+    CONF_MAC,
+    "serial",
+    "serial_number",
+}
 
 
 async def async_get_config_entry_diagnostics(
@@ -22,6 +30,7 @@ async def async_get_config_entry_diagnostics(
     coordinator = entry.runtime_data
     data = coordinator.data
     return {
+        "title": "**REDACTED**",
         "generation": coordinator.generation,
         "entry": {
             "data": async_redact_data(dict(entry.data), TO_REDACT),
@@ -32,7 +41,7 @@ async def async_get_config_entry_diagnostics(
             "has_login": coordinator.has_web_login,
         },
         "state": {
-            "status": asdict(data.status),
+            "status": async_redact_data(asdict(data.status), TO_REDACT),
             "mode": data.mode.value,
             "busy_remaining": data.busy_remaining,
             "pending": {k: str(v) for k, v in data.pending.items()},

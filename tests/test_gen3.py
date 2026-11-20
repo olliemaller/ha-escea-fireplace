@@ -9,6 +9,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.escea_fireplace.const import (
     CONF_GENERATION,
+    CONF_MAC,
     CONF_SERIAL,
     DOMAIN,
     GEN3,
@@ -22,7 +23,8 @@ from homeassistant.components.climate import (
     HVACAction,
     HVACMode,
 )
-from homeassistant.config_entries import SOURCE_USER
+from homeassistant.components.diagnostics import REDACTED
+from homeassistant.config_entries import SOURCE_DHCP, SOURCE_USER
 from homeassistant.const import (
     ATTR_ENTITY_ID,
     ATTR_TEMPERATURE,
@@ -36,6 +38,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import ServiceValidationError
+from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
 from .conftest import G3_HOST, FakeG3
 
@@ -180,3 +183,60 @@ async def test_electric_fire_has_no_modes(hass: HomeAssistant, fake_g3: FakeG3) 
     await hass.async_block_till_done()
     assert hass.states.get(MODE) is None
     assert ATTR_PRESET_MODE not in hass.states.get(CLIMATE).attributes
+
+
+G3_DHCP = DhcpServiceInfo(ip=G3_HOST, hostname="escea", macaddress="acde48ddeeff")
+
+
+async def test_dhcp_finds_wifi_fire(hass: HomeAssistant, fake_g3: FakeG3) -> None:
+    """A Wi-Fi fire found by DHCP is offered and saved with its MAC address."""
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_DHCP}, data=G3_DHCP
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "confirm"
+    with patch(
+        "custom_components.escea_fireplace.async_setup_entry", return_value=True
+    ):
+        result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_GENERATION] == GEN3
+    assert result["data"][CONF_MAC] == "ac:de:48:dd:ee:ff"
+
+
+async def test_dhcp_updates_wifi_fire_address(
+    hass: HomeAssistant, fake_g3: FakeG3
+) -> None:
+    """A known Wi-Fi fire on a new address updates the entry."""
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="654321",
+        data={CONF_HOST: "192.0.2.1", CONF_SERIAL: 654321, CONF_GENERATION: GEN3},
+    )
+    entry.add_to_hass(hass)
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_DHCP}, data=G3_DHCP
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert entry.data[CONF_HOST] == G3_HOST
+
+
+async def test_no_options_for_wifi_fires(
+    hass: HomeAssistant, g3_entry: MockConfigEntry
+) -> None:
+    """The web page options only apply to Ethernet fires."""
+    assert not g3_entry.supports_options
+
+
+async def test_diagnostics_hide_serial(
+    hass: HomeAssistant, g3_entry: MockConfigEntry
+) -> None:
+    """The serial number inside the fire's status is redacted too."""
+    from custom_components.escea_fireplace.diagnostics import (
+        async_get_config_entry_diagnostics,
+    )
+
+    result = await async_get_config_entry_diagnostics(hass, g3_entry)
+    assert result["state"]["status"]["serial"] == REDACTED
+    assert "654321" not in str(result)

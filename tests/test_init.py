@@ -366,3 +366,17 @@ async def test_poll_timer(
             break
         await asyncio.sleep(0.05)
     assert hass.states.get(CLIMATE).state == HVACMode.HEAT
+
+
+async def test_web_page_read_in_background(
+    hass: HomeAssistant,
+    loaded: MockConfigEntry,
+    fake_web: FakeWeb,
+    freezer: FrozenDateTimeFactory,
+) -> None:
+    """After setup, the slow web page is read without holding up the poll."""
+    fake_web.timers[1][0] = "07:15"
+    freezer.tick(timedelta(minutes=11))
+    await loaded.runtime_data.async_refresh()
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert hass.states.get(TIMER1_ON).state == "07:15:00"

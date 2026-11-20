@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.1.1
+
+Fixes, and needs aioescea 0.1.1.
+
+- Wi-Fi (Generation 3) fires are now found by DHCP, and a known one that
+  moves to a new address is updated automatically. Before, DHCP only knew
+  how to talk to Ethernet fires.
+- Turning off a fire that's already off (say, a nightly "make sure it's off"
+  automation) no longer blocks turning it on for 66 seconds.
+- The fire's web page is read in the background after setup. A slow page
+  could hold up the status poll, and the refresh after a command, for 10
+  seconds or more.
+- Saving a timer after the web login has expired logs in again instead of
+  failing.
+- Half degrees held while the fire lights now round up (22.5 °C sets 23 °C).
+- Diagnostics no longer include the serial number from a Wi-Fi fire's
+  status.
+- The web page options are hidden for Wi-Fi fires, which have no web page.
+- The Wi-Fi fire check when adding by address gives up after 5 seconds
+  instead of 10.
+- Manifest categories (`climate.thermostats_heating`), and brand images
+  trimmed to Home Assistant's rules.
+
 ## 0.1.0
 
 First release. A rebuild of [snikch/climate.escea](https://github.com/snikch/climate.escea) on the new [aioescea](https://github.com/olliemaller/aioescea) library.
