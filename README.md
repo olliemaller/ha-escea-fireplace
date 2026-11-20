@@ -172,7 +172,9 @@ Under **Settings → Devices & services → Escea Fireplace → Configure** (Eth
 | Read the fire's web page | On | Timers, clock and diagnostics. Turn it off if the web page gives you trouble; control carries on over UDP. |
 | Minutes between reads | 10 | 5 to 60. The web server is fragile, so keep this at 10 unless you have a reason. |
 
-When adding an Ethernet fire you may be asked for the **web page login** (username and password). It's usually the serial number and PIN, tried for you. Leave the password blank to skip it.
+When adding an Ethernet fire you may be asked for the **web page login** (username and password). It's usually the serial number and PIN, tried for you. Leave the password blank to skip it. To add or change it later, open the fireplace's **⋮ → Reconfigure** and enter the password (leave it blank to keep the current one).
+
+The fire's web page is slow, often 10–20 seconds a page. If it doesn't answer while you're adding the fire, the login is saved anyway and checked on the first read; if it's wrong, Home Assistant asks you to fix it.
 
 ## Known limitations
 

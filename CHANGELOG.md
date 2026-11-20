@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.2.1
+
+**Fixed**
+
+- A correct web page login (serial number and PIN) was reported as "didn't answer" on fires whose web page is slow, so timers and diagnostics couldn't be set up. The web page now gets 30 s per page and 60 s to log in (aioescea 0.1.2), and a login that can't be checked during setup is saved anyway. If it's wrong, the first web page read asks you to fix it.
+
+**New**
+
+- **Reconfigure** can now add or change the web page login, so a fire added with the web page skipped can get timers and diagnostics later without removing it.
+
 ## 0.2.0
 
 - New **Read web page now** button (Ethernet fires): reads the timers, clock

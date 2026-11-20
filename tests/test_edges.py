@@ -99,19 +99,66 @@ async def test_pick_from_several(
 async def test_web_page_unreachable(
     hass: HomeAssistant, fake_fire: FakeFire, fake_web: FakeWeb, no_setup: None
 ) -> None:
-    """A web page that doesn't answer is reported, and can be skipped."""
+    """A slow web page that doesn't answer keeps the serial and PIN login.
+
+    It's checked on the first web page read, which starts a reauth if wrong.
+    """
     fake_web.reachable = False
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}, data={CONF_HOST: FIRE_HOST}
     )
-    assert result["step_id"] == "web"
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {CONF_USERNAME: "x", CONF_PASSWORD: "y"}
-    )
-    assert result["errors"] == {"base": "web_unreachable"}
-    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert CONF_PASSWORD not in result["data"]
+    assert result["data"][CONF_USERNAME] == str(SERIAL)
+    assert result["data"][CONF_PASSWORD] == str(PIN)
+
+
+async def test_web_page_unreachable_for_a_typed_login(
+    hass: HomeAssistant, fake_fire: FakeFire, fake_web: FakeWeb, no_setup: None
+) -> None:
+    """A login typed while the page has stopped answering is saved too."""
+    fake_web.password = "9999"
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_USER}, data={CONF_HOST: FIRE_HOST}
+    )
+    assert result["step_id"] == "web"
+    fake_web.reachable = False
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_USERNAME: "admin", CONF_PASSWORD: "9999"}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_USERNAME] == "admin"
+
+
+async def test_reconfigure_adds_a_web_login(
+    hass: HomeAssistant, fake_fire: FakeFire, fake_web: FakeWeb, no_setup: None
+) -> None:
+    """A fire added without a web login can get one later."""
+    fake_web.password = "9999"
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id=str(SERIAL),
+        data={CONF_HOST: FIRE_HOST, CONF_SERIAL: SERIAL, CONF_PIN: PIN},
+    )
+    entry.add_to_hass(hass)
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_HOST: FIRE_HOST, CONF_PASSWORD: "1111"}
+    )
+    assert result["errors"] == {"base": "invalid_auth"}
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_HOST: FIRE_HOST, CONF_PASSWORD: "9999"}
+    )
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_USERNAME] == str(SERIAL)
+    assert entry.data[CONF_PASSWORD] == "9999"
+
+    # A blank password keeps the saved login.
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_HOST: FIRE_HOST, CONF_USERNAME: "", CONF_PASSWORD: ""}
+    )
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_PASSWORD] == "9999"
 
 
 async def test_reconfigure_errors(hass: HomeAssistant) -> None:

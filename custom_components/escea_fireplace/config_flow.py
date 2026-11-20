@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import logging
 from typing import Any
 
 from aioescea import (
@@ -51,6 +52,8 @@ from .const import (
 )
 from .coordinator import EsceaConfigEntry
 from .transport import async_discover_fireplaces, async_identify
+
+_LOGGER = logging.getLogger(__name__)
 
 CONF_FIREPLACE = "fireplace"
 
@@ -236,7 +239,12 @@ class EsceaConfigFlow(ConfigFlow, domain=DOMAIN):
     async def _async_check_login(
         self, host: str, username: str, password: str
     ) -> str | None:
-        """Return an error key, or None if the login works."""
+        """Return "invalid_auth" if the fire rejects the login, otherwise None.
+
+        The fire's web page is slow and sometimes doesn't answer at all, so a
+        login that can't be checked is saved anyway. If it turns out to be
+        wrong, the first web page read starts a reauth flow.
+        """
         web = EsceaWebClient(
             async_get_clientsession(self.hass),
             host,
@@ -247,8 +255,10 @@ class EsceaConfigFlow(ConfigFlow, domain=DOMAIN):
             await web.async_validate_login()
         except EsceaAuthError:
             return "invalid_auth"
-        except EsceaError:
-            return "web_unreachable"
+        except EsceaError as err:
+            _LOGGER.info(
+                "Couldn't check the web login for %s (%s); saving it anyway", host, err
+            )
         return None
 
     async def async_step_web(
@@ -324,9 +334,16 @@ class EsceaConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Change the fireplace's address."""
+        """Change the fireplace's address, or its web page login."""
         entry = self._get_reconfigure_entry()
         errors: dict[str, str] = {}
+        login: dict[str, Any] = {}
+        if user_input is not None and user_input.get(CONF_PASSWORD):
+            login = {
+                CONF_USERNAME: user_input.get(CONF_USERNAME)
+                or str(entry.data[CONF_SERIAL]),
+                CONF_PASSWORD: user_input[CONF_PASSWORD],
+            }
         if user_input is not None and entry.data.get(CONF_GENERATION) == GEN3:
             host = user_input[CONF_HOST].strip()
             status = await self._async_probe_g3(host)
@@ -348,14 +365,32 @@ class EsceaConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 await self.async_set_unique_id(str(fire.serial))
                 self._abort_if_unique_id_mismatch(reason="wrong_fireplace")
-                return self.async_update_reload_and_abort(
-                    entry, data_updates={CONF_HOST: fire.host}
+                if login:
+                    error = await self._async_check_login(
+                        fire.host, login[CONF_USERNAME], login[CONF_PASSWORD]
+                    )
+                    if error is not None:
+                        errors["base"] = error
+                if not errors:
+                    return self.async_update_reload_and_abort(
+                        entry, data_updates={CONF_HOST: fire.host, **login}
+                    )
+        schema: dict[Any, Any] = {
+            vol.Required(CONF_HOST, default=entry.data[CONF_HOST]): str
+        }
+        if entry.data.get(CONF_GENERATION) != GEN3:
+            schema[
+                vol.Optional(
+                    CONF_USERNAME,
+                    default=entry.data.get(CONF_USERNAME, str(entry.data[CONF_SERIAL])),
                 )
+            ] = str
+            schema[vol.Optional(CONF_PASSWORD)] = selector.TextSelector(
+                selector.TextSelectorConfig(type=selector.TextSelectorType.PASSWORD)
+            )
         return self.async_show_form(
             step_id="reconfigure",
-            data_schema=vol.Schema(
-                {vol.Required(CONF_HOST, default=entry.data[CONF_HOST]): str}
-            ),
+            data_schema=vol.Schema(schema),
             errors=errors,
         )
 
