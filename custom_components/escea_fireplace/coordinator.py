@@ -59,7 +59,8 @@ from .const import (
 )
 from .transport import async_broadcast_addresses, async_get_transport
 
-type EsceaConfigEntry = ConfigEntry[EsceaCoordinator | EsceaG3Coordinator]
+type EsceaAnyCoordinator = EsceaCoordinator | EsceaG3Coordinator
+type EsceaConfigEntry = ConfigEntry[EsceaAnyCoordinator]
 
 
 @dataclass(frozen=True, slots=True)
@@ -566,6 +567,7 @@ def clock_drift_minutes(clock: time | None, now: datetime) -> int | None:
 
 __all__ = [
     "CONF_GENERATION",
+    "EsceaAnyCoordinator",
     "EsceaConfigEntry",
     "EsceaCoordinator",
     "EsceaData",

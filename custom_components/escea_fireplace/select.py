@@ -8,7 +8,7 @@ from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .coordinator import EsceaConfigEntry, EsceaCoordinator
+from .coordinator import EsceaAnyCoordinator, EsceaConfigEntry
 from .entity import EsceaEntity
 
 PARALLEL_UPDATES = 1
@@ -30,7 +30,7 @@ class EsceaModeSelect(EsceaEntity, SelectEntity):
     _attr_translation_key = "mode"
     _attr_options = [mode.value for mode in FireMode]
 
-    def __init__(self, coordinator: EsceaCoordinator) -> None:
+    def __init__(self, coordinator: EsceaAnyCoordinator) -> None:
         super().__init__(coordinator, "mode")
 
     @property

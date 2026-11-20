@@ -11,7 +11,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .coordinator import EsceaConfigEntry, EsceaCoordinator
+from .coordinator import EsceaAnyCoordinator, EsceaConfigEntry
 from .entity import EsceaEntity, EsceaWebEntity
 
 PARALLEL_UPDATES = 1
@@ -35,7 +35,7 @@ class EsceaPowerSwitch(EsceaEntity, SwitchEntity):
 
     _attr_translation_key = "power"
 
-    def __init__(self, coordinator: EsceaCoordinator) -> None:
+    def __init__(self, coordinator: EsceaAnyCoordinator) -> None:
         super().__init__(coordinator, "power")
 
     @property
@@ -57,7 +57,7 @@ class EsceaTimerSwitch(EsceaWebEntity, SwitchEntity):
 
     _attr_entity_category = EntityCategory.CONFIG
 
-    def __init__(self, coordinator: EsceaCoordinator, number: int) -> None:
+    def __init__(self, coordinator: EsceaAnyCoordinator, number: int) -> None:
         super().__init__(coordinator, f"timer_{number}")
         self._number = number
         self._attr_translation_key = "timer"

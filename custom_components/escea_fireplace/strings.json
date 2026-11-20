@@ -24,7 +24,7 @@
       },
       "web": {
         "title": "Fireplace web page login",
-        "description": "The fireplace's timers, clock and diagnostics are on its web page (http://{host}). The usual login (serial number and PIN) didn't work. Enter the login, or leave both fields blank to skip: you'll still have full control, just not the timers and diagnostics.",
+        "description": "The fireplace's timers, clock and diagnostics are on its web page (http://{host}). The usual login (serial number and PIN) didn't work. Enter the login, or leave the password blank to skip: you'll still have full control, just not the timers and diagnostics.",
         "data": {
           "username": "Username",
           "password": "Password"
@@ -50,7 +50,7 @@
       "no_fireplaces": "No new Ethernet fires answered. Enter the IP address (Wi-Fi fires can't be found by searching).",
       "port_in_use": "Another program on this computer is using UDP port 3300, which fireplaces always reply to. Remove the other Escea integration, then try again.",
       "invalid_auth": "The web page didn't accept that login.",
-      "web_unreachable": "The fireplace's web page didn't answer. Leave both fields blank to skip it for now.",
+      "web_unreachable": "The fireplace's web page didn't answer. Leave the password blank to skip it for now.",
       "unknown": "Something unexpected went wrong. The logs have the details."
     },
     "abort": {

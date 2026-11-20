@@ -44,7 +44,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - run: pip install ${{ matrix.install }} ruff
+      - run: pip install ${{ matrix.install }} ruff mypy pytest-cov
       - name: Install the integration's requirements
         # Falls back to the library's main branch if this version isn't on
         # PyPI yet (while a library release is being prepared).
@@ -53,5 +53,8 @@ jobs:
           pip install $reqs || pip install "git+https://github.com/olliemaller/aioescea@main"
       - run: ruff check custom_components tests
       - run: ruff format --check custom_components tests
+      - name: Type check
+        if: matrix.ha == 'latest'
+        run: mypy --strict --implicit-reexport --ignore-missing-imports custom_components/escea_fireplace
       # The tests run a fake fire on 127.0.0.2, which Linux routes to loopback.
-      - run: pytest -q
+      - run: pytest -q --cov=custom_components.escea_fireplace --cov-report=term-missing --cov-fail-under=95

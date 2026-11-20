@@ -11,7 +11,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .coordinator import EsceaConfigEntry, EsceaCoordinator
+from .coordinator import EsceaAnyCoordinator, EsceaConfigEntry
 from .entity import EsceaWebEntity
 
 PARALLEL_UPDATES = 1
@@ -38,7 +38,9 @@ class EsceaTimerTime(EsceaWebEntity, TimeEntity):
 
     _attr_entity_category = EntityCategory.CONFIG
 
-    def __init__(self, coordinator: EsceaCoordinator, number: int, which: str) -> None:
+    def __init__(
+        self, coordinator: EsceaAnyCoordinator, number: int, which: str
+    ) -> None:
         super().__init__(coordinator, f"timer_{number}_{which}")
         self._number = number
         self._which = which
@@ -54,10 +56,9 @@ class EsceaTimerTime(EsceaWebEntity, TimeEntity):
     def native_value(self) -> time | None:
         """Return the time."""
         page = self.coordinator.data.home_page
-        if page is None:
-            return None
-        timer = page.timers[self._number]
-        return timer.on_time if self._which == "on" else timer.off_time
+        timer = page.timers[self._number] if page else None
+        on_off = (timer.on_time, timer.off_time) if timer else (None, None)
+        return on_off[0] if self._which == "on" else on_off[1]
 
     async def async_set_value(self, value: time) -> None:
         """Change the time (to the minute)."""

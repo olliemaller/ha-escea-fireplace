@@ -11,15 +11,15 @@ from homeassistant.helpers.device_registry import (
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import CONF_MAC, DOMAIN, MANUFACTURER
-from .coordinator import EsceaCoordinator
+from .coordinator import EsceaAnyCoordinator
 
 
-class EsceaEntity(CoordinatorEntity[EsceaCoordinator]):
+class EsceaEntity(CoordinatorEntity[EsceaAnyCoordinator]):
     """An entity belonging to one fireplace."""
 
     _attr_has_entity_name = True
 
-    def __init__(self, coordinator: EsceaCoordinator, key: str) -> None:
+    def __init__(self, coordinator: EsceaAnyCoordinator, key: str) -> None:
         super().__init__(coordinator)
         serial = coordinator.serial
         entry = coordinator.config_entry

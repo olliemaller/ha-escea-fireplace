@@ -15,7 +15,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import GEN2, GEN3
-from .coordinator import EsceaConfigEntry, EsceaCoordinator, EsceaData
+from .coordinator import (
+    EsceaAnyCoordinator,
+    EsceaConfigEntry,
+    EsceaData,
+)
 from .entity import EsceaEntity, EsceaWebEntity
 
 PARALLEL_UPDATES = 0
@@ -122,7 +126,9 @@ class EsceaBinarySensor(EsceaEntity, BinarySensorEntity):
     entity_description: EsceaBinarySensorDescription
 
     def __init__(
-        self, coordinator: EsceaCoordinator, description: EsceaBinarySensorDescription
+        self,
+        coordinator: EsceaAnyCoordinator,
+        description: EsceaBinarySensorDescription,
     ) -> None:
         super().__init__(coordinator, description.key)
         self.entity_description = description

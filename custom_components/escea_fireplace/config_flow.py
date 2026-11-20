@@ -15,7 +15,11 @@ from aioescea import (
     NcapiStatus,
     async_probe,
 )
-import voluptuous as vol
+
+try:  # Home Assistant 2026.10 moved its schemas to probatio.
+    import probatio as vol
+except ImportError:  # pragma: no cover - older Home Assistant
+    import voluptuous as vol  # type: ignore[no-redef]
 
 from homeassistant.config_entries import (
     ConfigFlow,
@@ -76,7 +80,7 @@ class EsceaConfigFlow(ConfigFlow, domain=DOMAIN):
     @callback
     def async_supports_options_flow(cls, entry: EsceaConfigEntry) -> bool:
         """Only Ethernet fires have a web page to configure."""
-        return entry.data.get(CONF_GENERATION, GEN2) == GEN2
+        return bool(entry.data.get(CONF_GENERATION, GEN2) == GEN2)
 
     # Adding by hand -------------------------------------------------------
 
@@ -267,7 +271,9 @@ class EsceaConfigFlow(ConfigFlow, domain=DOMAIN):
                 is None
             ):
                 return self._async_create(str(fire.serial), str(fire.pin))
-        elif not user_input.get(CONF_USERNAME) and not user_input.get(CONF_PASSWORD):
+        elif not user_input.get(CONF_PASSWORD):
+            # No password means skip. The username box is filled in for them,
+            # so it can't be used to tell.
             return self._async_create(None, None)
         else:
             error = await self._async_check_login(

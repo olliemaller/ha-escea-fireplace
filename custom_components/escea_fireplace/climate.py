@@ -24,7 +24,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .coordinator import EsceaConfigEntry, EsceaCoordinator, EsceaG3Coordinator
+from .coordinator import EsceaAnyCoordinator, EsceaConfigEntry
 from .entity import EsceaEntity
 
 PARALLEL_UPDATES = 1
@@ -64,12 +64,12 @@ class EsceaClimate(EsceaEntity, ClimateEntity):
     _attr_name = None
     _attr_translation_key = "fireplace"
     _attr_hvac_modes = [HVACMode.HEAT, HVACMode.OFF]
-    if NATIVE_TEMPERATURES:
+    if NATIVE_TEMPERATURES:  # pragma: no cover - depends on the HA version
         _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
-    else:
+    else:  # pragma: no cover
         _attr_temperature_unit = UnitOfTemperature.CELSIUS
 
-    def __init__(self, coordinator: EsceaCoordinator | EsceaG3Coordinator) -> None:
+    def __init__(self, coordinator: EsceaAnyCoordinator) -> None:
         super().__init__(coordinator, "")
         self._attr_min_temp = coordinator.min_temp
         self._attr_max_temp = coordinator.max_temp
@@ -97,14 +97,14 @@ class EsceaClimate(EsceaEntity, ClimateEntity):
     def _target_temperature(self) -> float:
         """Return the target, or the held one while the fire lights."""
         data = self.coordinator.data
-        return data.pending.get("temperature", data.status.target_temperature)
+        return float(data.pending.get("temperature", data.status.target_temperature))
 
-    if NATIVE_TEMPERATURES:
-        native_current_temperature = property(_room_temperature)  # type: ignore[assignment]
-        native_target_temperature = property(_target_temperature)  # type: ignore[assignment]
-    else:
-        current_temperature = property(_room_temperature)  # type: ignore[assignment]
-        target_temperature = property(_target_temperature)  # type: ignore[assignment]
+    if NATIVE_TEMPERATURES:  # pragma: no cover - depends on the HA version
+        native_current_temperature = property(_room_temperature)
+        native_target_temperature = property(_target_temperature)
+    else:  # pragma: no cover
+        current_temperature = property(_room_temperature)
+        target_temperature = property(_target_temperature)
 
     @property
     def hvac_mode(self) -> HVACMode:
@@ -125,9 +125,10 @@ class EsceaClimate(EsceaEntity, ClimateEntity):
 
     @property
     def preset_mode(self) -> str | None:
-        """Return the mode, or the held one while the fire lights."""
-        if not self.coordinator.supports_modes:
-            return None
+        """Return the mode, or the held one while the fire lights.
+
+        Only read when the fire supports modes (PRESET_MODE is set).
+        """
         data = self.coordinator.data
         return FireMode(data.pending.get("mode", data.mode)).value
 

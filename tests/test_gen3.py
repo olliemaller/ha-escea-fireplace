@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+from aioescea import EsceaConnectionError
+import aiohttp
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.test_util.aiohttp import AiohttpClientMocker
 
 from custom_components.escea_fireplace.const import (
     CONF_GENERATION,
@@ -33,11 +36,12 @@ from homeassistant.const import (
     SERVICE_TURN_ON,
     STATE_OFF,
     STATE_ON,
+    STATE_UNAVAILABLE,
     STATE_UNKNOWN,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
 from .conftest import G3_HOST, FakeG3
@@ -240,3 +244,71 @@ async def test_diagnostics_hide_serial(
     result = await async_get_config_entry_diagnostics(hass, g3_entry)
     assert result["state"]["status"]["serial"] == REDACTED
     assert "654321" not in str(result)
+
+
+async def test_reconfigure_wifi_fire(
+    hass: HomeAssistant, fake_g3: FakeG3, aioclient_mock: AiohttpClientMocker
+) -> None:
+    aioclient_mock.get("http://192.0.2.99/", exc=aiohttp.ClientError())
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        unique_id="654321",
+        data={CONF_HOST: "192.0.2.1", CONF_SERIAL: 654321, CONF_GENERATION: GEN3},
+    )
+    entry.add_to_hass(hass)
+    result = await entry.start_reconfigure_flow(hass)
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {CONF_HOST: "192.0.2.99"}
+    )
+    assert result["errors"] == {"base": "cannot_connect"}
+    with patch(
+        "custom_components.escea_fireplace.async_setup_entry", return_value=True
+    ):
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], {CONF_HOST: G3_HOST}
+        )
+    assert result["reason"] == "reconfigure_successful"
+    assert entry.data[CONF_HOST] == G3_HOST
+
+
+async def test_modes_when_on(
+    hass: HomeAssistant, g3_entry: MockConfigEntry, fake_g3: FakeG3
+) -> None:
+    fake_g3.state["state"] = "heating"
+    await g3_entry.runtime_data.async_refresh()
+    for option, key in (
+        ("boost", "fan_boost"),
+        ("flame_effect", "flame_effect"),
+        ("normal", "flame_effect"),
+    ):
+        await hass.services.async_call(
+            "select",
+            "select_option",
+            {ATTR_ENTITY_ID: MODE, "option": option},
+            blocking=True,
+        )
+        assert fake_g3.posts[-1][key] == ("false" if option == "normal" else "true")
+
+
+async def test_wifi_errors(
+    hass: HomeAssistant, g3_entry: MockConfigEntry, fake_g3: FakeG3
+) -> None:
+    """A failed read marks entities unavailable; a failed change raises."""
+    coordinator = g3_entry.runtime_data
+    with (
+        patch.object(
+            coordinator.client, "async_set", side_effect=EsceaConnectionError("x")
+        ),
+        pytest.raises(HomeAssistantError),
+    ):
+        await hass.services.async_call(
+            CLIMATE_DOMAIN, SERVICE_TURN_ON, {ATTR_ENTITY_ID: CLIMATE}, blocking=True
+        )
+    with pytest.raises(ServiceValidationError):
+        await coordinator.async_set_timer(None)  # type: ignore[arg-type]
+    with patch.object(
+        coordinator.client, "async_get_status", side_effect=EsceaConnectionError("x")
+    ):
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+    assert hass.states.get(CLIMATE).state == STATE_UNAVAILABLE

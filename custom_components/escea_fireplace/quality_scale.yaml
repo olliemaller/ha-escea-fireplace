@@ -1,0 +1,98 @@
+# Home Assistant integration quality scale: where this integration stands.
+# https://contributors.home-assistant.io/core/quality-scale/rules/
+# Custom integrations can't declare a tier in manifest.json, so this file is
+# a self-assessment against every rule up to Platinum.
+rules:
+  # Bronze
+  action-setup:
+    status: exempt
+    comment: No custom actions. Control is through the standard climate, select, switch and time actions.
+  appropriate-polling:
+    status: done
+    comment: UDP status every 30 s; the fragile web page every 10 min (5 to 60, with backoff).
+  brands:
+    status: done
+    comment: Icons and dark variants in custom_components/escea_fireplace/brand/.
+  common-modules: done
+  config-flow: done
+  config-flow-test-coverage: done
+  dependency-transparency:
+    status: done
+    comment: aioescea is MIT, on PyPI, and published from GitHub Actions with trusted publishing.
+  docs-actions:
+    status: exempt
+    comment: No custom actions.
+  docs-conditions:
+    status: exempt
+    comment: No custom conditions.
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+  docs-triggers:
+    status: exempt
+    comment: No custom triggers.
+  entity-event-setup:
+    status: exempt
+    comment: Entities only read the coordinator; nothing to subscribe to.
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure: done
+  test-before-setup: done
+  unique-config-entry: done
+
+  # Silver
+  action-exceptions: done
+  config-entry-unloading: done
+  docs-configuration-parameters: done
+  docs-installation-parameters: done
+  entity-unavailable: done
+  integration-owner: done
+  log-when-unavailable:
+    status: done
+    comment: DataUpdateCoordinator logs the loss once and the recovery once.
+  parallel-updates: done
+  reauthentication-flow:
+    status: done
+    comment: For the Ethernet fires' web page login. Wi-Fi fires have no login.
+  test-coverage:
+    status: done
+    comment: 100% of every module; CI fails under 95%.
+
+  # Gold
+  devices: done
+  diagnostics: done
+  discovery:
+    status: done
+    comment: DHCP (Escea MAC prefix and registered devices) and UDP broadcast search.
+  discovery-update-info: done
+  docs-data-update: done
+  docs-examples: done
+  docs-known-limitations: done
+  docs-supported-devices: done
+  docs-supported-functions: done
+  docs-troubleshooting: done
+  docs-use-cases: done
+  dynamic-devices:
+    status: exempt
+    comment: One fire per config entry; there are no child devices to appear later.
+  entity-category: done
+  entity-device-class: done
+  entity-disabled-by-default: done
+  entity-translations: done
+  exception-translations: done
+  icon-translations: done
+  reconfiguration-flow: done
+  repair-issues:
+    status: done
+    comment: Port 3300 in use, a conflicting Escea integration, and fire clock drift.
+  stale-devices:
+    status: exempt
+    comment: One device per config entry; deleting the entry removes it.
+
+  # Platinum
+  async-dependency: done
+  inject-websession: done
+  strict-typing:
+    status: done
+    comment: mypy --strict in CI; aioescea ships py.typed.

@@ -162,7 +162,25 @@ actions:
       entity_id: climate.escea_123456
 ```
 
-## Troubleshooting
+## Options
+
+Under **Settings → Devices & services → Escea Fireplace → Configure** (Ethernet fires only):
+
+| Option | Default | What it does |
+|---|---|---|
+| Read the fire's web page | On | Timers, clock and diagnostics. Turn it off if the web page gives you trouble; control carries on over UDP. |
+| Minutes between reads | 10 | 5 to 60. The web server is fragile, so keep this at 10 unless you have a reason. |
+
+When adding an Ethernet fire you may be asked for the **web page login** (username and password). It's usually the serial number and PIN, tried for you. Leave the password blank to skip it.
+
+## Known limitations
+
+- **Ethernet fires:** only one program per host can use UDP port 3300, so this can't run alongside another Escea integration, or alongside a second Home Assistant on the same machine.
+- **Ethernet fires** ignore commands for about 66 seconds after turning on or off. Temperature and mode are held until then; turning on again isn't.
+- **Wi-Fi fires** have no timers or diagnostics through Escea's API, and can't be found by searching: they need a DHCP reservation.
+- Fan boost and flame effect are on gas fires only.
+- The fire's clock can't be set from Home Assistant. If it drifts, a Repairs issue says so; set it on the remote.
+
 
 | Problem | Try |
 |---|---|
@@ -174,6 +192,13 @@ actions:
 | Fire never gets an IP address | A known controller fault: power cycle it. If it recurs, set your DHCP server to broadcast its offers to the fire's MAC address. |
 
 Turn on debug logging for `custom_components.escea_fireplace` and `aioescea`, and attach a diagnostics download to any issue.
+
+## Removing the integration
+
+1. Go to **Settings → Devices & services → Escea Fireplace**, open the **⋮** menu on the fire and choose **Delete**.
+2. If you installed it through HACS, remove it there too, then restart Home Assistant.
+
+The fire itself is untouched: its timers, clock and settings stay as they were.
 
 ## Credits
 

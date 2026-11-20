@@ -26,10 +26,9 @@ from homeassistant.util import dt as dt_util
 
 from .const import GEN2, GEN3
 from .coordinator import (
+    EsceaAnyCoordinator,
     EsceaConfigEntry,
-    EsceaCoordinator,
     EsceaData,
-    EsceaG3Coordinator,
     clock_drift_minutes,
 )
 from .entity import EsceaEntity, EsceaWebEntity
@@ -68,9 +67,8 @@ def _fire_state(data: EsceaData) -> str | None:
 
 
 def _clock_offset(data: EsceaData) -> int | None:
-    if data.home_page is None:
-        return None
-    return clock_drift_minutes(data.home_page.clock, dt_util.now())
+    clock = data.home_page.clock if data.home_page else None
+    return clock_drift_minutes(clock, dt_util.now())
 
 
 SENSORS: tuple[EsceaSensorDescription, ...] = (
@@ -193,7 +191,7 @@ class EsceaSensor(EsceaEntity, SensorEntity):
 
     def __init__(
         self,
-        coordinator: EsceaCoordinator | EsceaG3Coordinator,
+        coordinator: EsceaAnyCoordinator,
         description: EsceaSensorDescription,
     ) -> None:
         super().__init__(coordinator, description.key)
