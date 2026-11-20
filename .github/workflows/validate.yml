@@ -46,7 +46,11 @@ jobs:
           python-version: ${{ matrix.python }}
       - run: pip install ${{ matrix.install }} ruff
       - name: Install the integration's requirements
-        run: pip install $(python -c "import json;print(' '.join(json.load(open('custom_components/escea_fireplace/manifest.json'))['requirements']))")
+        # Falls back to the library's main branch if this version isn't on
+        # PyPI yet (while a library release is being prepared).
+        run: |
+          reqs=$(python -c "import json;print(' '.join(json.load(open('custom_components/escea_fireplace/manifest.json'))['requirements']))")
+          pip install $reqs || pip install "git+https://github.com/olliemaller/aioescea@main"
       - run: ruff check custom_components tests
       - run: ruff format --check custom_components tests
       # The tests run a fake fire on 127.0.0.2, which Linux routes to loopback.
