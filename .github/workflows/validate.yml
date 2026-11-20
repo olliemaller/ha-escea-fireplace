@@ -1,0 +1,53 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hassfest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: home-assistant/actions/hassfest@master
+
+  # The Marketplace catalogue only accepts a clean run: no ignored checks.
+  hacs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: hacs/action@main
+        with:
+          category: integration
+
+  tests:
+    name: tests (Home Assistant ${{ matrix.ha }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - ha: "2025.8"
+            python: "3.13"
+            install: '"homeassistant==2025.8.3" pytest-homeassistant-custom-component "pycares<5"'
+          # Home Assistant 2026.3 and later need Python 3.14.
+          - ha: latest
+            python: "3.14"
+            install: pytest-homeassistant-custom-component
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: pip install ${{ matrix.install }} ruff
+      - name: Install the integration's requirements
+        run: pip install $(python -c "import json;print(' '.join(json.load(open('custom_components/escea_fireplace/manifest.json'))['requirements']))")
+      - run: ruff check custom_components tests
+      - run: ruff format --check custom_components tests
+      # The tests run a fake fire on 127.0.0.2, which Linux routes to loopback.
+      - run: pytest -q

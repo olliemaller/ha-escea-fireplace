@@ -1,0 +1,51 @@
+{
+  "entity": {
+    "climate": {
+      "fireplace": {
+        "default": "mdi:fireplace",
+        "state_attributes": {
+          "preset_mode": {
+            "default": "mdi:fire",
+            "state": {
+              "normal": "mdi:fire",
+              "boost": "mdi:fan-plus",
+              "flame_effect": "mdi:candle"
+            }
+          }
+        }
+      }
+    },
+    "select": {
+      "mode": {
+        "default": "mdi:fire",
+        "state": {
+          "normal": "mdi:fire",
+          "boost": "mdi:fan-plus",
+          "flame_effect": "mdi:candle"
+        }
+      }
+    },
+    "switch": {
+      "power": { "default": "mdi:fireplace-off", "state": { "on": "mdi:fireplace" } },
+      "timer": { "default": "mdi:timer-outline" }
+    },
+    "time": {
+      "timer_on": { "default": "mdi:timer-play-outline" },
+      "timer_off": { "default": "mdi:timer-stop-outline" }
+    },
+    "sensor": {
+      "ready_in": { "default": "mdi:timer-sand" },
+      "clock_offset": { "default": "mdi:clock-alert-outline" },
+      "gas_drive": { "default": "mdi:gas-burner" },
+      "flue_fan_drive": { "default": "mdi:fan" },
+      "room_fan_drive": { "default": "mdi:fan" },
+      "processor_temperature": { "default": "mdi:chip" }
+    },
+    "binary_sensor": {
+      "busy": { "default": "mdi:fire-alert" },
+      "pilot_valve_power": { "default": "mdi:valve" },
+      "thermal_cutout_power": { "default": "mdi:thermometer-alert" },
+      "ignition_power": { "default": "mdi:lightning-bolt" }
+    }
+  }
+}

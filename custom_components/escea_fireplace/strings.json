@@ -1,0 +1,222 @@
+{
+  "config": {
+    "flow_title": "{name}",
+    "step": {
+      "user": {
+        "title": "Add an Escea fireplace",
+        "description": "Leave the address blank to search your network. Enter the fireplace's IP address if it's on another network or the search doesn't find it.",
+        "data": {
+          "host": "IP address"
+        },
+        "data_description": {
+          "host": "Optional. Your router's list of devices shows it: look for a MAC address starting AC:DE:48."
+        }
+      },
+      "pick": {
+        "title": "Choose a fireplace",
+        "data": {
+          "fireplace": "Fireplace"
+        }
+      },
+      "confirm": {
+        "title": "Escea fireplace found",
+        "description": "Add {name} at {host}?"
+      },
+      "web": {
+        "title": "Fireplace web page login",
+        "description": "The fireplace's timers, clock and diagnostics are on its web page (http://{host}). The usual login (serial number and PIN) didn't work. Enter the login, or leave both fields blank to skip: you'll still have full control, just not the timers and diagnostics.",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
+      },
+      "reconfigure": {
+        "title": "Change the fireplace's address",
+        "data": {
+          "host": "IP address"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Fireplace web page login",
+        "description": "The fireplace's web page no longer accepts the login. Usually the username is the serial number and the password is the PIN.",
+        "data": {
+          "username": "Username",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "The fireplace didn't answer. Check the address, and that it's connected by Ethernet and turned on at the wall.",
+      "no_fireplaces": "No new fireplaces answered. Try entering the IP address.",
+      "port_in_use": "Another program on this computer is using UDP port 3300, which fireplaces always reply to. Remove the other Escea integration, then try again.",
+      "invalid_auth": "The web page didn't accept that login.",
+      "web_unreachable": "The fireplace's web page didn't answer. Leave both fields blank to skip it for now.",
+      "unknown": "Something unexpected went wrong. The logs have the details."
+    },
+    "abort": {
+      "already_configured": "This fireplace is already added. Its address has been updated.",
+      "not_escea": "That device isn't an Escea fireplace.",
+      "wrong_fireplace": "That address belongs to a different fireplace.",
+      "reconfigure_successful": "Address updated.",
+      "reauth_successful": "Login updated."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Web page",
+        "description": "The fireplace's web page has its timers, clock and diagnostics. It can only handle the odd request, so it's read every few minutes at most.",
+        "data": {
+          "web_enabled": "Read the web page",
+          "web_interval": "How often"
+        },
+        "data_description": {
+          "web_enabled": "Turn off to use control over UDP only. The timer and diagnostic entities are removed.",
+          "web_interval": "Minutes between reads. Leave it at 10 unless you have a reason."
+        }
+      }
+    }
+  },
+  "entity": {
+    "climate": {
+      "fireplace": {
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "normal": "Normal",
+              "boost": "Boost",
+              "flame_effect": "Flame effect"
+            }
+          }
+        }
+      }
+    },
+    "select": {
+      "mode": {
+        "name": "Mode",
+        "state": {
+          "normal": "Normal",
+          "boost": "Boost",
+          "flame_effect": "Flame effect"
+        }
+      }
+    },
+    "switch": {
+      "power": {
+        "name": "Power"
+      },
+      "timer": {
+        "name": "Timer {number}"
+      }
+    },
+    "time": {
+      "timer_on": {
+        "name": "Timer {number} on"
+      },
+      "timer_off": {
+        "name": "Timer {number} off"
+      }
+    },
+    "sensor": {
+      "room_temperature": {
+        "name": "Room temperature"
+      },
+      "ready_in": {
+        "name": "Ready in"
+      },
+      "clock_offset": {
+        "name": "Clock offset"
+      },
+      "processor_temperature": {
+        "name": "Controller temperature"
+      },
+      "duct_temperature": {
+        "name": "Duct temperature"
+      },
+      "gas_drive": {
+        "name": "Gas drive"
+      },
+      "flue_fan_drive": {
+        "name": "Flue fan drive"
+      },
+      "room_fan_drive": {
+        "name": "Room fan drive"
+      },
+      "solenoid_current": {
+        "name": "Solenoid current"
+      },
+      "valve_current": {
+        "name": "Gas valve current"
+      }
+    },
+    "binary_sensor": {
+      "busy": {
+        "name": "Lighting or shutting down"
+      },
+      "pilot_valve_power": {
+        "name": "Pilot valve"
+      },
+      "thermal_cutout_power": {
+        "name": "Thermal cut-out"
+      },
+      "ignition_power": {
+        "name": "Ignition"
+      },
+      "power_b2_sv": {
+        "name": "B2 or SV power"
+      },
+      "power_b3": {
+        "name": "B3 power"
+      },
+      "aux_switch": {
+        "name": "Auxiliary switch"
+      },
+      "automation_switch": {
+        "name": "Automation switch"
+      },
+      "flue_fan_override": {
+        "name": "Flue fan override"
+      }
+    }
+  },
+  "exceptions": {
+    "unreachable": {
+      "message": "The fireplace at {host} didn't answer."
+    },
+    "busy": {
+      "message": "The fireplace is still lighting or shutting down. Try again in {seconds} seconds."
+    },
+    "invalid_state": {
+      "message": "The fireplace can't do that right now: {error}"
+    },
+    "mode_while_off": {
+      "message": "Turn the fireplace on first. Choosing Boost or Flame effect while it's off would light it. You can choose the mode straight after turning it on: it's applied once the fire has lit."
+    },
+    "web_unavailable": {
+      "message": "The timers need the fireplace's web page, which isn't available. Check the web login, or turn the web page on in the integration's options."
+    },
+    "web_login_failed": {
+      "message": "The fireplace's web page rejected the login."
+    },
+    "timer_failed": {
+      "message": "Couldn't save the timer: {error}"
+    },
+    "port_in_use": {
+      "message": "UDP port 3300 is in use by another program."
+    }
+  },
+  "issues": {
+    "port_in_use": {
+      "title": "Escea Fireplace can't open UDP port 3300",
+      "description": "Escea fireplaces always reply to UDP port 3300, so only one program on this computer can talk to them. Something else already has the port, usually Home Assistant's built-in Escea integration or the old snikch custom component. Remove the other one and restart Home Assistant."
+    },
+    "conflict": {
+      "title": "Two Escea integrations are installed",
+      "description": "The `{domain}` integration also talks to Escea fireplaces on UDP port 3300. Only one of them can hear the fireplaces' replies, so one will keep going unavailable. Remove `{domain}` and restart Home Assistant."
+    },
+    "clock_drift": {
+      "title": "{name}'s clock is {minutes} minutes {direction}",
+      "description": "The fireplace's own timers run on its clock, so they're switching it on and off {minutes} minutes off schedule. Set the time on the fireplace's remote or in the Escea app. If the clock keeps drifting, the fire may have lost power.\n\nTimers in Home Assistant automations aren't affected."
+    }
+  }
+}
