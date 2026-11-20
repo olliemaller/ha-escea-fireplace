@@ -11,7 +11,7 @@ import socket
 from typing import Any
 from unittest.mock import patch
 
-from aioescea import EsceaTransport
+from aioescea import EsceaConnectionError, EsceaTransport, EsceaWebClient
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from pytest_homeassistant_custom_component.test_util.aiohttp import (
@@ -175,15 +175,33 @@ class FakeWeb:
 
 
 @pytest.fixture
-def fake_web(aioclient_mock: AiohttpClientMocker, fake_fire: FakeFire) -> FakeWeb:
-    """Route every request for the fire's web page to FakeWeb."""
+def fake_web(
+    aioclient_mock: AiohttpClientMocker, fake_fire: FakeFire
+) -> Generator[FakeWeb]:
+    """Route every request for the fire's web page to FakeWeb.
+
+    GETs go through aiohttp (Home Assistant's HTTP mock). aioescea sends POSTs
+    over a raw socket, so those are routed to FakeWeb directly.
+    """
     web = FakeWeb(fake_fire)
-    for method in ("get", "post"):
-        for path in ("index.html", "doLogin.html", "diagnostics.html"):
-            aioclient_mock.request(
-                method, f"http://{FIRE_HOST}/{path}", side_effect=web.handle
-            )
-    return web
+    for path in ("index.html", "doLogin.html", "diagnostics.html"):
+        aioclient_mock.get(f"http://{FIRE_HOST}/{path}", side_effect=web.handle)
+
+    async def post(
+        client: EsceaWebClient,
+        path: str,
+        data: dict[str, str],
+        *,
+        token: str | None,
+        timeout: float,
+    ) -> str:
+        reply = await web.handle("post", URL(f"http://{client.host}/{path}"), data)
+        if reply.exc is not None:
+            raise EsceaConnectionError(f"POST /{path} failed: {reply.exc!r}")
+        return await reply.text()
+
+    with patch.object(EsceaWebClient, "_post", post):
+        yield web
 
 
 @pytest.fixture

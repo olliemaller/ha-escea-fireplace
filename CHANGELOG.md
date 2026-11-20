@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+**Fixed**
+
+- The web page login still timed out on a real fire after 0.2.1, so timers, the clock and diagnostics stayed unavailable. The fire's web server only reads the first network packet of a request, and the login form arrived in a second one. aioescea 0.1.3 sends the whole request in one packet.
+
 ## 0.2.1
 
 **Fixed**
