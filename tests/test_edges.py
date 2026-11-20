@@ -324,3 +324,33 @@ async def test_clock_in_step_clears_issue(
     assert await hass.config_entries.async_setup(entry.entry_id)
     await hass.async_block_till_done()
     assert ir.async_get(hass).async_get_issue(DOMAIN, f"clock_drift_{SERIAL}") is None
+
+
+async def test_flame_effect_shows_idle(
+    hass: HomeAssistant, loaded: MockConfigEntry, fake_fire: FakeFire
+) -> None:
+    """Flame effect gives little heat, so the thermostat shows idle."""
+    fake_fire.state.is_on = True
+    fake_fire.state.flame_effect = True
+    await _refresh(hass, loaded)
+    assert hass.states.get(CLIMATE).attributes["hvac_action"] == "idle"
+    fake_fire.state.flame_effect = False
+    await _refresh(hass, loaded)
+    assert hass.states.get(CLIMATE).attributes["hvac_action"] == "heating"
+
+
+async def test_read_web_page_button(
+    hass: HomeAssistant, loaded: MockConfigEntry, fake_web: FakeWeb
+) -> None:
+    """The button reads the web page straight away."""
+    fake_web.timers[2][1] = "23:15"
+    await hass.services.async_call(
+        "button",
+        "press",
+        {ATTR_ENTITY_ID: f"button.escea_{SERIAL}_read_web_page_now"},
+        blocking=True,
+    )
+    assert hass.states.get(f"time.escea_{SERIAL}_timer_2_off").state == "23:15:00"
+    # A press while a read is running does nothing.
+    loaded.runtime_data._web_running = True
+    await loaded.runtime_data.async_refresh_web()

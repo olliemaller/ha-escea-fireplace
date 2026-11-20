@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0
+
+- New **Read web page now** button (Ethernet fires): reads the timers, clock
+  and diagnostics straight away instead of waiting up to 10 minutes. It also
+  clears any backoff after the page struggled.
+- In flame effect mode the thermostat shows **idle** rather than heating,
+  since flame effect gives very little heat.
+
 ## 0.1.2
 
 - Fixed: when asked for the web page login while adding a fire, leaving the

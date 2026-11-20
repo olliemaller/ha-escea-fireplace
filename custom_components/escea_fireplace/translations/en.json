@@ -200,6 +200,11 @@
       "has_errors": {
         "name": "Stored errors"
       }
+    },
+    "button": {
+      "refresh_web": {
+        "name": "Read web page now"
+      }
     }
   },
   "exceptions": {

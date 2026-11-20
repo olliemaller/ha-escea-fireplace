@@ -104,13 +104,14 @@ That's it for Ethernet fires. On most of them the web page login is the serial n
 | Lighting or shutting down | Binary sensor | Ethernet fires: on for about a minute after a power change |
 | Timer 1, Timer 2 | Switch (config) | Ethernet fires, needs the web page |
 | Timer 1 on/off, Timer 2 on/off | Time (config) | Ethernet fires, needs the web page |
+| Read web page now | Button (diagnostic) | Ethernet fires: reads the timers, clock and diagnostics straight away |
 | Clock offset | Sensor (diagnostic) | Ethernet fires: minutes the fire's clock is ahead (+) or behind (−) |
 | Gas drive, flue fan drive, room fan drive | Sensor (diagnostic) | Ethernet fires, % |
 | Controller temperature | Sensor (diagnostic) | Ethernet fires |
 | Pilot valve, thermal cut-out | Binary sensor (diagnostic) | Ethernet fires |
 | Ready in, duct temperature, solenoid and gas valve current, ignition, B2/SV, B3, auxiliary, automation and flue fan override | Diagnostic, off by default | Ethernet fires. Turn on in the entity settings |
 
-Mode and the thermostat's presets are on gas fires only.
+Mode and the thermostat's presets are on gas fires only. In flame effect mode the thermostat shows **idle** rather than heating, since flame effect is mostly for looks.
 
 ## How it works
 

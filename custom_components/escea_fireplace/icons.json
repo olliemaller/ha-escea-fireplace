@@ -94,6 +94,11 @@
           "on": "mdi:remote"
         }
       }
+    },
+    "button": {
+      "refresh_web": {
+        "default": "mdi:web-refresh"
+      }
     }
   }
 }

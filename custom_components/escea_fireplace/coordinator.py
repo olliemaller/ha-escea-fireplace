@@ -273,6 +273,17 @@ class EsceaCoordinator(DataUpdateCoordinator[EsceaData]):
                 )
             )
 
+    async def async_refresh_web(self) -> None:
+        """Read the web page now (the button), unless a read is already running.
+
+        A press also clears any backoff: someone asking is a good sign the
+        page is back.
+        """
+        if self._web_running:
+            return
+        self._web_running = True
+        await self._async_update_web_and_publish()
+
     async def _async_update_web(self) -> None:
         """Read the web page, backing off hard if it struggles."""
         ok = True

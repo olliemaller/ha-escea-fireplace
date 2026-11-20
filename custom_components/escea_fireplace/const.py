@@ -13,6 +13,7 @@ MANUFACTURER = "Escea"
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
+    Platform.BUTTON,
     Platform.CLIMATE,
     Platform.SELECT,
     Platform.SENSOR,

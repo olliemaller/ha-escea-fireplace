@@ -116,12 +116,17 @@ class EsceaClimate(EsceaEntity, ClimateEntity):
         """Return what the fire is doing.
 
         Generation 3 fires report their state; Generation 2 only on or off.
+        Flame effect is for looks and gives little heat, so it shows as idle.
         """
         status = self.coordinator.data.status
         state = getattr(status, "state", None)
         if state is not None:
-            return G3_ACTIONS.get(state, HVACAction.OFF)
-        return HVACAction.HEATING if status.is_on else HVACAction.OFF
+            action = G3_ACTIONS.get(state, HVACAction.OFF)
+        else:
+            action = HVACAction.HEATING if status.is_on else HVACAction.OFF
+        if action is HVACAction.HEATING and status.flame_effect:
+            return HVACAction.IDLE
+        return action
 
     @property
     def preset_mode(self) -> str | None:

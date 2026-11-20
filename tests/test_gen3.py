@@ -312,3 +312,12 @@ async def test_wifi_errors(
         await coordinator.async_refresh()
         await hass.async_block_till_done()
     assert hass.states.get(CLIMATE).state == STATE_UNAVAILABLE
+
+
+async def test_flame_effect_shows_idle(
+    hass: HomeAssistant, g3_entry: MockConfigEntry, fake_g3: FakeG3
+) -> None:
+    fake_g3.state.update(state="heating", flame_effect=True)
+    await g3_entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+    assert hass.states.get(CLIMATE).attributes[ATTR_HVAC_ACTION] == HVACAction.IDLE

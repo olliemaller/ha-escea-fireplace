@@ -259,6 +259,7 @@ async def test_web_disabled(
     assert hass.states.get(CLIMATE)
     assert hass.states.get(TIMER1) is None
     assert hass.states.get(GAS) is None
+    assert hass.states.get(f"button.escea_{SERIAL}_read_web_page_now") is None
 
 
 async def test_clock_drift_issue(
