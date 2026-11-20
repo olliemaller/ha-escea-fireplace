@@ -1,15 +1,33 @@
 {
   "domain": "escea_fireplace",
   "name": "Escea Fireplace",
-  "codeowners": ["@olliemaller"],
+  "categories": [
+    "climate.thermostats_heating"
+  ],
+  "codeowners": [
+    "@olliemaller"
+  ],
   "config_flow": true,
-  "dependencies": ["network"],
-  "dhcp": [{ "macaddress": "ACDE48*" }, { "registered_devices": true }],
+  "dependencies": [
+    "network"
+  ],
+  "dhcp": [
+    {
+      "macaddress": "ACDE48*"
+    },
+    {
+      "registered_devices": true
+    }
+  ],
   "documentation": "https://github.com/olliemaller/ha-escea-fireplace",
   "integration_type": "device",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/olliemaller/ha-escea-fireplace/issues",
-  "loggers": ["aioescea"],
-  "requirements": ["aioescea==0.1.0"],
+  "loggers": [
+    "aioescea"
+  ],
+  "requirements": [
+    "aioescea==0.1.0"
+  ],
   "version": "0.1.0"
 }
