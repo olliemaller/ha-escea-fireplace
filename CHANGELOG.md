@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.2
+
+- Fixed: when asked for the web page login while adding a fire, leaving the
+  password blank to skip it failed with an error, because the username box
+  is filled in for you. A blank password now skips it, as the form says.
+- Every module is fully tested (CI fails below 95%) and type checked with
+  `mypy --strict`, and `quality_scale.yaml` records where the integration
+  stands against Home Assistant's quality scale.
+- On Home Assistant 2026.10 and later, the config flow uses `probatio`, the
+  schema library Home Assistant moved to.
+- Docs: options, known limitations, and removing the integration.
+
 ## 0.1.1
 
 Fixes, and needs aioescea 0.1.1.
