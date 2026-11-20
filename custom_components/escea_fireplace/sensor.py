@@ -5,6 +5,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from aioescea import FireState
+
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -22,10 +24,12 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.util import dt as dt_util
 
+from .const import GEN2, GEN3
 from .coordinator import (
     EsceaConfigEntry,
     EsceaCoordinator,
     EsceaData,
+    EsceaG3Coordinator,
     clock_drift_minutes,
 )
 from .entity import EsceaEntity, EsceaWebEntity
@@ -37,9 +41,10 @@ PARALLEL_UPDATES = 0
 class EsceaSensorDescription(SensorEntityDescription):
     """How to read one sensor."""
 
-    value_fn: Callable[[EsceaData], float | int | None]
+    value_fn: Callable[[EsceaData], float | int | str | None]
     from_web: bool = False
     needs_login: bool = False
+    generations: frozenset[int] = frozenset({GEN2, GEN3})
 
 
 def _diag(attr: str) -> Callable[[EsceaData], int | None]:
@@ -47,6 +52,19 @@ def _diag(attr: str) -> Callable[[EsceaData], int | None]:
         return getattr(data.diagnostics, attr) if data.diagnostics else None
 
     return value
+
+
+def _room_temperature(data: EsceaData) -> float | None:
+    status = data.status
+    # A Generation 3 fire's reading is stale when it can't hear its remote.
+    if getattr(status, "remote_present", True) is False:
+        return None
+    return status.room_temperature
+
+
+def _fire_state(data: EsceaData) -> str | None:
+    state = getattr(data.status, "state", None)
+    return state.value if state is not None else None
 
 
 def _clock_offset(data: EsceaData) -> int | None:
@@ -62,7 +80,15 @@ SENSORS: tuple[EsceaSensorDescription, ...] = (
         device_class=SensorDeviceClass.TEMPERATURE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
-        value_fn=lambda data: data.status.room_temperature,
+        value_fn=_room_temperature,
+    ),
+    EsceaSensorDescription(
+        key="fire_state",
+        translation_key="fire_state",
+        device_class=SensorDeviceClass.ENUM,
+        options=[state.value for state in FireState],
+        value_fn=_fire_state,
+        generations=frozenset({GEN3}),
     ),
     EsceaSensorDescription(
         key="ready_in",
@@ -72,6 +98,7 @@ SENSORS: tuple[EsceaSensorDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         entity_registry_enabled_default=False,
         value_fn=lambda data: round(data.busy_remaining),
+        generations=frozenset({GEN2}),
     ),
     EsceaSensorDescription(
         key="clock_offset",
@@ -148,10 +175,13 @@ async def async_setup_entry(
             coordinator, description
         )
         for description in SENSORS
-        if not description.from_web
-        or (
-            coordinator.web_enabled
-            and (not description.needs_login or coordinator.web.has_credentials)
+        if coordinator.generation in description.generations
+        and (
+            not description.from_web
+            or (
+                coordinator.web_enabled
+                and (not description.needs_login or coordinator.has_web_login)
+            )
         )
     )
 
@@ -162,13 +192,15 @@ class EsceaSensor(EsceaEntity, SensorEntity):
     entity_description: EsceaSensorDescription
 
     def __init__(
-        self, coordinator: EsceaCoordinator, description: EsceaSensorDescription
+        self,
+        coordinator: EsceaCoordinator | EsceaG3Coordinator,
+        description: EsceaSensorDescription,
     ) -> None:
         super().__init__(coordinator, description.key)
         self.entity_description = description
 
     @property
-    def native_value(self) -> float | int | None:
+    def native_value(self) -> float | int | str | None:
         """Return the reading."""
         return self.entity_description.value_fn(self.coordinator.data)
 

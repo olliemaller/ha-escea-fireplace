@@ -19,8 +19,9 @@ async def async_setup_entry(
     entry: EsceaConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
-    """Add the mode select."""
-    async_add_entities([EsceaModeSelect(entry.runtime_data)])
+    """Add the mode select (gas fires only)."""
+    if entry.runtime_data.supports_modes:
+        async_add_entities([EsceaModeSelect(entry.runtime_data)])
 
 
 class EsceaModeSelect(EsceaEntity, SelectEntity):

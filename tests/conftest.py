@@ -221,3 +221,71 @@ def no_setup() -> Generator[None]:
         "custom_components.escea_fireplace.async_setup_entry", return_value=True
     ):
         yield
+
+
+@dataclass
+class FakeG3:
+    """A Generation 3 (Wi-Fi) fire's NCAPI, through Home Assistant's HTTP mock."""
+
+    state: dict[str, Any] = field(
+        default_factory=lambda: {
+            "protocol_version": "1",
+            "fire_type": "gas",
+            "state": "off",
+            "fan_boost": False,
+            "flame_effect": False,
+            "target_temp_deci_c": 220,
+            "room_temp_deci_c": 185,
+            "remote_present": True,
+            "serial_number": "654321",
+            "errors": False,
+        }
+    )
+    posts: list[dict[str, str]] = field(default_factory=list)
+
+    async def handle(
+        self, method: str, url: URL, data: Any
+    ) -> AiohttpClientMockResponse:
+        if method.upper() == "GET":
+            return AiohttpClientMockResponse(method, url, json=self.state)
+        params = dict(url.query)
+        self.posts.append(params)
+        if "on" in params:
+            self.state["state"] = (
+                "starting" if params["on"] == "true" else "shutting_down"
+            )
+        if "target_temp_deci_c" in params:
+            self.state["target_temp_deci_c"] = int(params["target_temp_deci_c"])
+        if params.get("fan_boost") == "true":
+            self.state.update(fan_boost=True, flame_effect=False)
+        elif params.get("fan_boost") == "false":
+            self.state["fan_boost"] = False
+        if params.get("flame_effect") == "true":
+            self.state.update(flame_effect=True, fan_boost=False)
+        elif params.get("flame_effect") == "false":
+            self.state["flame_effect"] = False
+        return AiohttpClientMockResponse(method, url)
+
+
+G3_HOST = "192.0.2.60"
+
+
+@pytest.fixture
+def fake_g3(aioclient_mock: AiohttpClientMocker) -> FakeG3:
+    """A Generation 3 fire at G3_HOST."""
+    fire = FakeG3()
+    for method in ("get", "post"):
+        aioclient_mock.request(method, f"http://{G3_HOST}/", side_effect=fire.handle)
+    return fire
+
+
+@pytest.fixture(autouse=True)
+def no_g3_probe(request: pytest.FixtureRequest) -> Generator[None]:
+    """Addresses aren't Generation 3 fires unless the test has one."""
+    if "fake_g3" in request.fixturenames:
+        yield
+        return
+    with patch(
+        "custom_components.escea_fireplace.config_flow.async_probe", return_value=None
+    ):
+        yield

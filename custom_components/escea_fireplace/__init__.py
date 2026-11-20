@@ -9,8 +9,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import issue_registry as ir
 
-from .const import DOMAIN, PLATFORMS
-from .coordinator import EsceaConfigEntry, EsceaCoordinator
+from .const import CONF_GENERATION, DOMAIN, GEN2, GEN3, PLATFORMS
+from .coordinator import EsceaConfigEntry, EsceaCoordinator, EsceaG3Coordinator
 from .transport import async_close_transport_if_unused
 
 #: Other integrations that also bind UDP 3300 and so can't run alongside.
@@ -19,6 +19,13 @@ CONFLICTING_DOMAINS = ("escea",)
 
 async def async_setup_entry(hass: HomeAssistant, entry: EsceaConfigEntry) -> bool:
     """Set up an Escea fireplace from a config entry."""
+    if entry.data.get(CONF_GENERATION, GEN2) == GEN3:
+        g3 = EsceaG3Coordinator(hass, entry)
+        await g3.async_config_entry_first_refresh()
+        entry.runtime_data = g3
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        return True
+
     _check_conflicts(hass)
     try:
         coordinator = await EsceaCoordinator.async_create(hass, entry)
@@ -50,7 +57,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: EsceaConfigEntry) -> bo
         others = [
             e
             for e in hass.config_entries.async_entries(DOMAIN)
-            if e.entry_id != entry.entry_id and e.state is ConfigEntryState.LOADED
+            if e.entry_id != entry.entry_id
+            and e.state is ConfigEntryState.LOADED
+            and e.data.get(CONF_GENERATION, GEN2) == GEN2
         ]
         await async_close_transport_if_unused(hass, bool(others))
     return unloaded

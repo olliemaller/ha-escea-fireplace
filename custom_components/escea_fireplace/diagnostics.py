@@ -22,13 +22,14 @@ async def async_get_config_entry_diagnostics(
     coordinator = entry.runtime_data
     data = coordinator.data
     return {
+        "generation": coordinator.generation,
         "entry": {
             "data": async_redact_data(dict(entry.data), TO_REDACT),
             "options": dict(entry.options),
         },
         "web": {
             "enabled": coordinator.web_enabled,
-            "has_login": coordinator.web.has_credentials,
+            "has_login": coordinator.has_web_login,
         },
         "state": {
             "status": asdict(data.status),

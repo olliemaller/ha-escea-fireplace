@@ -4,6 +4,7 @@
 
 First release. A rebuild of [snikch/climate.escea](https://github.com/snikch/climate.escea) on the new [aioescea](https://github.com/olliemaller/aioescea) library.
 
+- **Generation 3 Wi-Fi fires** through Escea's NCAPI: on/off, temperature (10–38 °C), Boost and Flame effect, plus what the fire is doing (starting, igniting, heating, pilot only, shutting down, error), whether it can hear its remote, and stored errors.
 - Set up from the UI: search every network, type an address, or accept a fire found when it joins the network (DHCP, MAC `AC:DE:48`).
 - Thermostat with Normal, Boost and Flame effect presets, plus a power switch, mode select and room temperature sensor.
 - The fire's two built-in timers, as switches and times you can change.

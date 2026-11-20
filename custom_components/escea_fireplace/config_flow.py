@@ -12,6 +12,8 @@ from aioescea import (
     EsceaError,
     EsceaPortInUseError,
     EsceaWebClient,
+    NcapiStatus,
+    async_probe,
 )
 import voluptuous as vol
 
@@ -28,6 +30,7 @@ from homeassistant.helpers.device_registry import format_mac
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
 from .const import (
+    CONF_GENERATION,
     CONF_MAC,
     CONF_PIN,
     CONF_SERIAL,
@@ -35,6 +38,7 @@ from .const import (
     CONF_WEB_INTERVAL,
     DEFAULT_WEB_INTERVAL_MINUTES,
     DOMAIN,
+    GEN3,
     LOGGER,
     MAX_WEB_INTERVAL_MINUTES,
     MIN_WEB_INTERVAL_MINUTES,
@@ -74,6 +78,8 @@ class EsceaConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
         if user_input is not None:
             host = (user_input.get(CONF_HOST) or "").strip()
+            if host and (g3 := await self._async_probe_g3(host)) is not None:
+                return await self._async_create_g3(host, g3)
             try:
                 if host:
                     return await self._async_found(
@@ -104,6 +110,27 @@ class EsceaConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="user",
             data_schema=vol.Schema({vol.Optional(CONF_HOST, default=""): str}),
             errors=errors,
+        )
+
+    async def _async_probe_g3(self, host: str) -> NcapiStatus | None:
+        """Return the status if the address is a Generation 3 (Wi-Fi) fire."""
+        status = await async_probe(async_get_clientsession(self.hass), host)
+        if status is None or not status.serial:
+            return None
+        return status
+
+    async def _async_create_g3(
+        self, host: str, status: NcapiStatus
+    ) -> ConfigFlowResult:
+        """Add a Generation 3 fire. No web page login is needed."""
+        await self.async_set_unique_id(status.serial)
+        self._abort_if_unique_id_configured(updates={CONF_HOST: host})
+        serial: int | str = (
+            int(status.serial) if status.serial.isdigit() else status.serial
+        )
+        return self.async_create_entry(
+            title=f"Escea {serial}",
+            data={CONF_HOST: host, CONF_SERIAL: serial, CONF_GENERATION: GEN3},
         )
 
     async def async_step_pick(
@@ -264,7 +291,18 @@ class EsceaConfigFlow(ConfigFlow, domain=DOMAIN):
         """Change the fireplace's address."""
         entry = self._get_reconfigure_entry()
         errors: dict[str, str] = {}
-        if user_input is not None:
+        if user_input is not None and entry.data.get(CONF_GENERATION) == GEN3:
+            host = user_input[CONF_HOST].strip()
+            status = await self._async_probe_g3(host)
+            if status is None:
+                errors["base"] = "cannot_connect"
+            else:
+                await self.async_set_unique_id(status.serial)
+                self._abort_if_unique_id_mismatch(reason="wrong_fireplace")
+                return self.async_update_reload_and_abort(
+                    entry, data_updates={CONF_HOST: host}
+                )
+        elif user_input is not None:
             try:
                 fire = await async_identify(self.hass, user_input[CONF_HOST].strip())
             except EsceaPortInUseError:

@@ -31,7 +31,11 @@ class EsceaEntity(CoordinatorEntity[EsceaCoordinator]):
             identifiers={(DOMAIN, str(serial))},
             connections=connections,
             manufacturer=MANUFACTURER,
-            model="Gas fireplace",
+            model=(
+                "Generation 3 (Wi-Fi)"
+                if coordinator.generation == 3
+                else "Generation 2 (Ethernet)"
+            ),
             name=entry.title,
             serial_number=str(serial),
             configuration_url=f"http://{entry.data[CONF_HOST]}/",

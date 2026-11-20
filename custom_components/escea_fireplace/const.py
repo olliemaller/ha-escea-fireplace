@@ -21,6 +21,11 @@ PLATFORMS: list[Platform] = [
 ]
 
 CONF_SERIAL = "serial"
+CONF_GENERATION = "generation"
+#: Ethernet fires with the UDP protocol (and a web page for timers).
+GEN2 = 2
+#: Wi-Fi fires (from 2024) with Escea's NCAPI over HTTP.
+GEN3 = 3
 CONF_PIN = "pin"
 CONF_MAC = "mac"
 CONF_WEB_ENABLED = "web_enabled"
@@ -49,4 +54,5 @@ REDISCOVER_AFTER_FAILURES = 3
 CLOCK_DRIFT_MINUTES = 5
 
 DISCOVERY_TIMEOUT = 5.0
+NCAPI_PROBE_TIMEOUT = 5.0
 DATA_TRANSPORT = f"{DOMAIN}_transport"

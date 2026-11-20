@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from aioescea import MAX_TEMPERATURE, MIN_TEMPERATURE, FireMode
+from aioescea import FireMode, FireState
 from awesomeversion import AwesomeVersion
 
 from homeassistant.components.climate import (
@@ -16,6 +16,7 @@ from homeassistant.components.climate import (
 )
 from homeassistant.const import (
     ATTR_TEMPERATURE,
+    PRECISION_TENTHS,
     PRECISION_WHOLE,
     UnitOfTemperature,
     __version__ as HA_VERSION,
@@ -23,7 +24,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .coordinator import EsceaConfigEntry, EsceaCoordinator
+from .coordinator import EsceaConfigEntry, EsceaCoordinator, EsceaG3Coordinator
 from .entity import EsceaEntity
 
 PARALLEL_UPDATES = 1
@@ -33,6 +34,19 @@ PRESETS = [mode.value for mode in FireMode]
 #: Home Assistant 2026.11 renamed the climate temperature properties to
 #: native_*. Use whichever this version expects, so neither warns.
 NATIVE_TEMPERATURES = AwesomeVersion(HA_VERSION) >= AwesomeVersion("2026.11.0")
+
+#: What a Generation 3 fire's reported state means for Home Assistant.
+G3_ACTIONS: dict[FireState, HVACAction] = {
+    FireState.STARTING: HVACAction.PREHEATING,
+    FireState.RETRYING: HVACAction.PREHEATING,
+    FireState.IGNITING: HVACAction.PREHEATING,
+    FireState.HEATING: HVACAction.HEATING,
+    FireState.BURN_OFF: HVACAction.HEATING,
+    FireState.GAS_ADJUST: HVACAction.HEATING,
+    FireState.PILOT_ONLY: HVACAction.IDLE,
+    FireState.SHUTTING_DOWN: HVACAction.FAN,
+    FireState.COOL_DOWN: HVACAction.FAN,
+}
 
 
 async def async_setup_entry(
@@ -50,28 +64,35 @@ class EsceaClimate(EsceaEntity, ClimateEntity):
     _attr_name = None
     _attr_translation_key = "fireplace"
     _attr_hvac_modes = [HVACMode.HEAT, HVACMode.OFF]
-    _attr_preset_modes = PRESETS
-    _attr_supported_features = (
-        ClimateEntityFeature.TARGET_TEMPERATURE
-        | ClimateEntityFeature.PRESET_MODE
-        | ClimateEntityFeature.TURN_ON
-        | ClimateEntityFeature.TURN_OFF
-    )
     if NATIVE_TEMPERATURES:
         _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
     else:
         _attr_temperature_unit = UnitOfTemperature.CELSIUS
-    _attr_target_temperature_step = PRECISION_WHOLE
-    _attr_precision = PRECISION_WHOLE
-    _attr_min_temp = MIN_TEMPERATURE
-    _attr_max_temp = MAX_TEMPERATURE
 
-    def __init__(self, coordinator: EsceaCoordinator) -> None:
+    def __init__(self, coordinator: EsceaCoordinator | EsceaG3Coordinator) -> None:
         super().__init__(coordinator, "")
+        self._attr_min_temp = coordinator.min_temp
+        self._attr_max_temp = coordinator.max_temp
+        self._attr_target_temperature_step = coordinator.temp_step
+        self._attr_precision = (
+            PRECISION_WHOLE if coordinator.temp_step == 1 else PRECISION_TENTHS
+        )
+        features = (
+            ClimateEntityFeature.TARGET_TEMPERATURE
+            | ClimateEntityFeature.TURN_ON
+            | ClimateEntityFeature.TURN_OFF
+        )
+        if coordinator.supports_modes:
+            features |= ClimateEntityFeature.PRESET_MODE
+            self._attr_preset_modes = PRESETS
+        self._attr_supported_features = features
 
-    def _room_temperature(self) -> float:
-        """Return the room temperature the fire measures."""
-        return self.coordinator.data.status.room_temperature
+    def _room_temperature(self) -> float | None:
+        """Return the room temperature, or None if it's stale."""
+        status = self.coordinator.data.status
+        if getattr(status, "remote_present", True) is False:
+            return None
+        return status.room_temperature
 
     def _target_temperature(self) -> float:
         """Return the target, or the held one while the fire lights."""
@@ -92,21 +113,32 @@ class EsceaClimate(EsceaEntity, ClimateEntity):
 
     @property
     def hvac_action(self) -> HVACAction:
-        """Return heating while on, otherwise off."""
-        return (
-            HVACAction.HEATING if self.coordinator.data.status.is_on else HVACAction.OFF
-        )
+        """Return what the fire is doing.
+
+        Generation 3 fires report their state; Generation 2 only on or off.
+        """
+        status = self.coordinator.data.status
+        state = getattr(status, "state", None)
+        if state is not None:
+            return G3_ACTIONS.get(state, HVACAction.OFF)
+        return HVACAction.HEATING if status.is_on else HVACAction.OFF
 
     @property
-    def preset_mode(self) -> str:
+    def preset_mode(self) -> str | None:
         """Return the mode, or the held one while the fire lights."""
+        if not self.coordinator.supports_modes:
+            return None
         data = self.coordinator.data
         return FireMode(data.pending.get("mode", data.mode)).value
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        """Show how long until the fire takes commands again."""
-        return {"busy_seconds": round(self.coordinator.data.busy_remaining)}
+        """Show what the fire is doing, or how long until it takes commands."""
+        data = self.coordinator.data
+        state = getattr(data.status, "state", None)
+        if state is not None:
+            return {"fire_state": state.value}
+        return {"busy_seconds": round(data.busy_remaining)}
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode) -> None:
         """Turn on (heat) or off."""

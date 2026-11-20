@@ -8,16 +8,22 @@ from datetime import datetime, time, timedelta
 from typing import Any
 
 from aioescea import (
+    MAX_TEMPERATURE,
+    MIN_TEMPERATURE,
+    NCAPI_MAX_TEMPERATURE,
+    NCAPI_MIN_TEMPERATURE,
     Diagnostics,
     EsceaAuthError,
     EsceaBusyError,
     EsceaConnectionError,
     EsceaError,
     EsceaFireplace,
+    EsceaNcapiClient,
     EsceaStateError,
     EsceaWebClient,
     FireMode,
     HomePage,
+    NcapiStatus,
     Status,
     Timer,
     async_find,
@@ -36,11 +42,14 @@ from homeassistant.util import dt as dt_util
 
 from .const import (
     CLOCK_DRIFT_MINUTES,
+    CONF_GENERATION,
     CONF_SERIAL,
     CONF_WEB_ENABLED,
     CONF_WEB_INTERVAL,
     DEFAULT_WEB_INTERVAL_MINUTES,
     DOMAIN,
+    GEN2,
+    GEN3,
     LOGGER,
     REDISCOVER_AFTER_FAILURES,
     UPDATE_INTERVAL,
@@ -49,14 +58,14 @@ from .const import (
 )
 from .transport import async_broadcast_addresses, async_get_transport
 
-type EsceaConfigEntry = ConfigEntry[EsceaCoordinator]
+type EsceaConfigEntry = ConfigEntry[EsceaCoordinator | EsceaG3Coordinator]
 
 
 @dataclass(frozen=True, slots=True)
 class EsceaData:
     """Everything known about the fire after an update."""
 
-    status: Status
+    status: Status | NcapiStatus
     busy_remaining: float
     home_page: HomePage | None = None
     diagnostics: Diagnostics | None = None
@@ -66,7 +75,7 @@ class EsceaData:
     @property
     def mode(self) -> FireMode:
         """Return normal, boost or flame effect."""
-        return mode_from_status(self.status)
+        return mode_from_status(self.status)  # type: ignore[arg-type]
 
 
 class EsceaCoordinator(DataUpdateCoordinator[EsceaData]):
@@ -83,6 +92,11 @@ class EsceaCoordinator(DataUpdateCoordinator[EsceaData]):
     """
 
     config_entry: EsceaConfigEntry
+    generation = GEN2
+    min_temp = MIN_TEMPERATURE
+    max_temp = MAX_TEMPERATURE
+    temp_step = 1.0
+    supports_modes = True
 
     def __init__(
         self,
@@ -143,6 +157,11 @@ class EsceaCoordinator(DataUpdateCoordinator[EsceaData]):
                 CONF_WEB_INTERVAL, DEFAULT_WEB_INTERVAL_MINUTES
             )
         )
+
+    @property
+    def has_web_login(self) -> bool:
+        """Return True if the web page login is set."""
+        return self.web.has_credentials
 
     @property
     def can_write_web(self) -> bool:
@@ -405,6 +424,99 @@ class EsceaCoordinator(DataUpdateCoordinator[EsceaData]):
             self._ready_unsub = None
 
 
+class EsceaG3Coordinator(DataUpdateCoordinator[EsceaData]):
+    """Reads a Generation 3 (Wi-Fi) fire through Escea's NCAPI every 30 s.
+
+    No lighting window or held commands: the fire accepts requests in any
+    state and reports what it's doing itself.
+    """
+
+    config_entry: EsceaConfigEntry
+    generation = GEN3
+    min_temp = NCAPI_MIN_TEMPERATURE
+    max_temp = NCAPI_MAX_TEMPERATURE
+    temp_step = 0.5
+    web_enabled = False
+    can_write_web = False
+    has_web_login = False
+
+    def __init__(self, hass: HomeAssistant, entry: EsceaConfigEntry) -> None:
+        super().__init__(
+            hass,
+            LOGGER,
+            config_entry=entry,
+            name=f"{DOMAIN} {entry.data[CONF_SERIAL]}",
+            update_interval=UPDATE_INTERVAL,
+            always_update=False,
+        )
+        self.serial = entry.data[CONF_SERIAL]
+        self.client = EsceaNcapiClient(
+            async_get_clientsession(hass), entry.data[CONF_HOST]
+        )
+
+    @property
+    def supports_modes(self) -> bool:
+        """Fan boost and flame effect are on gas fires only."""
+        return self.data is None or self.data.status.is_gas  # type: ignore[union-attr]
+
+    async def _async_update_data(self) -> EsceaData:
+        try:
+            status = await self.client.async_get_status()
+        except EsceaError as err:
+            raise UpdateFailed(
+                translation_domain=DOMAIN,
+                translation_key="unreachable",
+                translation_placeholders={"host": self.client.host},
+            ) from err
+        return EsceaData(status=status, busy_remaining=0.0)
+
+    async def _async_set(self, **kwargs: Any) -> None:
+        try:
+            await self.client.async_set(**kwargs)
+        except EsceaError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="ncapi_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
+        await self.async_refresh()
+
+    async def async_turn_on(self) -> None:
+        """Light the fire."""
+        await self._async_set(on=True)
+
+    async def async_turn_off(self) -> None:
+        """Turn the fire off."""
+        await self._async_set(on=False)
+
+    async def async_set_temperature(self, temperature: float) -> None:
+        """Set the target temperature."""
+        await self._async_set(target_temperature=temperature)
+
+    async def async_set_mode(self, mode: FireMode) -> None:
+        """Set normal, boost or flame effect. Refused while off."""
+        if self.data and not self.data.status.is_on and mode is not FireMode.NORMAL:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN, translation_key="mode_while_off"
+            )
+        if mode is FireMode.BOOST:
+            await self._async_set(fan_boost=True)
+        elif mode is FireMode.FLAME_EFFECT:
+            await self._async_set(flame_effect=True)
+        else:
+            await self._async_set(fan_boost=False, flame_effect=False)
+
+    async def async_set_timer(self, timer: Timer) -> None:
+        """Generation 3 fires have no timers through the API."""
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="web_unavailable"
+        )
+
+    @callback
+    def async_shutdown_timers(self) -> None:
+        """Nothing to cancel."""
+
+
 def clock_drift_minutes(clock: time | None, now: datetime) -> int | None:
     """Return how many minutes the fire's clock is ahead (+) or behind (-).
 
@@ -420,8 +532,10 @@ def clock_drift_minutes(clock: time | None, now: datetime) -> int | None:
 
 
 __all__ = [
+    "CONF_GENERATION",
     "EsceaConfigEntry",
     "EsceaCoordinator",
     "EsceaData",
+    "EsceaG3Coordinator",
     "clock_drift_minutes",
 ]

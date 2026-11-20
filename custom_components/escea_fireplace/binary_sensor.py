@@ -14,6 +14,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
+from .const import GEN2, GEN3
 from .coordinator import EsceaConfigEntry, EsceaCoordinator, EsceaData
 from .entity import EsceaEntity, EsceaWebEntity
 
@@ -26,6 +27,7 @@ class EsceaBinarySensorDescription(BinarySensorEntityDescription):
 
     value_fn: Callable[[EsceaData], bool | None]
     from_web: bool = False
+    generations: frozenset[int] = frozenset({GEN2, GEN3})
 
 
 def _diag(attr: str) -> Callable[[EsceaData], bool | None]:
@@ -41,6 +43,22 @@ BINARY_SENSORS: tuple[EsceaBinarySensorDescription, ...] = (
         translation_key="busy",
         device_class=BinarySensorDeviceClass.RUNNING,
         value_fn=lambda data: data.busy_remaining > 0,
+        generations=frozenset({GEN2}),
+    ),
+    EsceaBinarySensorDescription(
+        key="remote_present",
+        translation_key="remote_present",
+        device_class=BinarySensorDeviceClass.CONNECTIVITY,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: getattr(data.status, "remote_present", None),
+        generations=frozenset({GEN3}),
+    ),
+    EsceaBinarySensorDescription(
+        key="has_errors",
+        translation_key="has_errors",
+        device_class=BinarySensorDeviceClass.PROBLEM,
+        value_fn=lambda data: getattr(data.status, "has_errors", None),
+        generations=frozenset({GEN3}),
     ),
     EsceaBinarySensorDescription(
         key="pilot_valve_power",
@@ -87,13 +105,14 @@ async def async_setup_entry(
 ) -> None:
     """Add the binary sensors."""
     coordinator = entry.runtime_data
-    web_ok = coordinator.web_enabled and coordinator.web.has_credentials
+    web_ok = coordinator.web_enabled and coordinator.has_web_login
     async_add_entities(
         (EsceaWebBinarySensor if description.from_web else EsceaBinarySensor)(
             coordinator, description
         )
         for description in BINARY_SENSORS
-        if not description.from_web or web_ok
+        if coordinator.generation in description.generations
+        and (not description.from_web or web_ok)
     )
 
 

@@ -4,12 +4,12 @@
     "step": {
       "user": {
         "title": "Add an Escea fireplace",
-        "description": "Leave the address blank to search your network. Enter the fireplace's IP address if it's on another network or the search doesn't find it.",
+        "description": "Leave the address blank to search your network for Ethernet (Generation 2) fires. For Wi-Fi (Generation 3) fires, or a fire on another network, enter its IP address.\n\nWi-Fi fires need **Escea NCAPI Settings** turned on in the Escea Smartheat app (Fire Settings, firmware 1.5.9 or later) and a DHCP reservation in your router.",
         "data": {
           "host": "IP address"
         },
         "data_description": {
-          "host": "Optional. Your router's list of devices shows it: look for a MAC address starting AC:DE:48."
+          "host": "Optional for Ethernet fires. Wi-Fi fires show their IP address in the Smartheat app's Wi-Fi settings page."
         }
       },
       "pick": {
@@ -46,8 +46,8 @@
       }
     },
     "error": {
-      "cannot_connect": "The fireplace didn't answer. Check the address, and that it's connected by Ethernet and turned on at the wall.",
-      "no_fireplaces": "No new fireplaces answered. Try entering the IP address.",
+      "cannot_connect": "The fireplace didn't answer. Check the address and that it's turned on at the wall. For a Wi-Fi fire, check that Escea NCAPI Settings is turned on in the Smartheat app.",
+      "no_fireplaces": "No new Ethernet fires answered. Enter the IP address (Wi-Fi fires can't be found by searching).",
       "port_in_use": "Another program on this computer is using UDP port 3300, which fireplaces always reply to. Remove the other Escea integration, then try again.",
       "invalid_auth": "The web page didn't accept that login.",
       "web_unreachable": "The fireplace's web page didn't answer. Leave both fields blank to skip it for now.",
@@ -147,6 +147,23 @@
       },
       "valve_current": {
         "name": "Gas valve current"
+      },
+      "fire_state": {
+        "name": "State",
+        "state": {
+          "off": "Off",
+          "starting": "Starting",
+          "retrying": "Retrying",
+          "igniting": "Igniting",
+          "heating": "Heating",
+          "burn_off": "Burn-off",
+          "cool_down": "Cooling down",
+          "gas_adjust": "Gas adjustment",
+          "pilot_only": "Pilot only",
+          "shutting_down": "Shutting down",
+          "error": "Error",
+          "unknown": "Unknown"
+        }
       }
     },
     "binary_sensor": {
@@ -176,6 +193,12 @@
       },
       "flue_fan_override": {
         "name": "Flue fan override"
+      },
+      "remote_present": {
+        "name": "Remote"
+      },
+      "has_errors": {
+        "name": "Stored errors"
       }
     }
   },
@@ -203,6 +226,9 @@
     },
     "port_in_use": {
       "message": "UDP port 3300 is in use by another program."
+    },
+    "ncapi_failed": {
+      "message": "The fireplace didn't accept the change: {error}"
     }
   },
   "issues": {
