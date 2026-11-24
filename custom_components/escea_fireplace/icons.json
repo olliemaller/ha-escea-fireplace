@@ -14,6 +14,19 @@
         }
       }
     },
+    "event": {
+      "fault": {
+        "default": "mdi:alert-circle-outline",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "ignition_failed": "mdi:fire-alert",
+              "fault": "mdi:alert"
+            }
+          }
+        }
+      }
+    },
     "select": {
       "mode": {
         "default": "mdi:fire",

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0
+
+Not released yet. Needs aioescea 0.1.4.
+
+**Added**
+
+- Maximum run time (all fires): an option, off by default, that turns the fire off once it has been on for 1 to 12 hours. It only ever turns the fire off. The count starts when Home Assistant sees the fire on and starts again whenever it's turned off and on. Nothing is saved over a restart, so a fire that's on when Home Assistant starts is counted from then: it can run longer than the limit after a restart, but it's never turned off early. When it acts it logs a warning and fires an `escea_fireplace_auto_off` event. Wi-Fi fires now have a Configure page for this.
+- Fault event (Wi-Fi fires): `ignition_failed` when the fire starts retrying a failed lighting, and `fault` when it goes into error or stores a new error. Shows in the logbook and can trigger a notification.
+
+**Docs**
+
+- How to count run hours and estimate gas use with Home Assistant's History stats and Template helpers, and automation examples for the new event and the maximum run time.
+
 ## 0.2.3
 
 Released 24 November 2026. Needs aioescea 0.1.4.

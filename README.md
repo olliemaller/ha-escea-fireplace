@@ -39,6 +39,8 @@
 | On/off, temperature, Boost, Flame effect | ✓ (4-30 °C) | ✓ (10-38 °C, 0.5 °C steps) |
 | What the fire is doing (starting, igniting, heating, pilot only, shutting down, error) | | ✓ |
 | Remote seen, stored errors | | ✓ |
+| Fault event (lighting failed, fault) | | ✓ |
+| Maximum run time | ✓ | ✓ |
 | Fire's built-in timers, clock and diagnostics | ✓ | |
 
 Both protocols come from Escea: the LAN protocol specification (v0.3, still current for Generation 2) and the Network Communication API (NCAPI, document 640051, 2024) for Generation 3.
@@ -54,6 +56,8 @@ Both protocols come from Escea: the LAN protocol specification (v0.3, still curr
 | **What it's doing** | Wi-Fi fires report starting, igniting, heating, pilot only, shutting down and errors, shown as the thermostat's action and a State sensor. Ethernet fires show "Lighting or shutting down" for the minute after a power change, when they ignore commands; anything you change in that minute is applied as soon as it's ready. |
 | **Finds itself** | Searches every network Home Assistant is on, offers new fires as they join the network, and follows the fire if its IP address changes. |
 | **Repairs** | Tells you if the fire's clock has drifted (so its timers run late), or if another Escea integration is fighting over the network port. |
+| **Maximum run time** | Optional: turns the fire off after it has been on for 1 to 12 hours, in case it's left on. |
+| **Fault alerts** | Wi-Fi fires: a Fault event when the fire has to retry lighting, goes into error, or stores a new error, so you can send yourself a notification. |
 | **Safe by design** | Never re-sends an old command, so it can't re-light a fire someone turned off with the remote or the Escea app. Won't light the fire just because you picked a mode. Turning off is never refused. |
 
 ## Which integration is right for you?
@@ -132,6 +136,7 @@ No list of tested models yet. If it works (or doesn't) on yours, please say so i
 | State | Sensor | Wi-Fi fires: off, starting, igniting, heating, pilot only, shutting down, error… |
 | Remote | Binary sensor (diagnostic) | Wi-Fi fires: the fire can hear its remote (it needs to, to start) |
 | Stored errors | Binary sensor | Wi-Fi fires: errors to check on the remote or app |
+| Fault | Event | Wi-Fi fires: `ignition_failed` when the fire starts retrying a failed lighting, `fault` when it goes into error or stores a new error |
 | Lighting or shutting down | Binary sensor | Ethernet fires: on for about a minute after a power change |
 | Timer 1, Timer 2 | Switch (config) | Ethernet fires, needs the web page |
 | Timer 1 on/off, Timer 2 on/off | Time (config) | Ethernet fires, needs the web page |
@@ -181,6 +186,34 @@ actions:
       temperature: 22
 ```
 
+Tell me when the fire can't light or has a fault (Wi-Fi fires):
+
+```yaml
+triggers:
+  - trigger: state
+    entity_id: event.escea_123456_fault
+    not_from: unavailable
+actions:
+  - action: notify.notify
+    data:
+      message: >-
+        Fireplace: {{ 'lighting failed' if trigger.to_state.attributes.event_type
+        == 'ignition_failed' else 'fault' }} (state {{
+        trigger.to_state.attributes.state }})
+```
+
+Tell me when the maximum run time turned the fire off:
+
+```yaml
+triggers:
+  - trigger: event
+    event_type: escea_fireplace_auto_off
+actions:
+  - action: notify.notify
+    data:
+      message: "{{ trigger.event.data.name }} was on for {{ trigger.event.data.hours }} hours, so it was turned off."
+```
+
 Turn it off when everyone leaves:
 
 ```yaml
@@ -196,16 +229,38 @@ actions:
 
 ## Options
 
-Under **Settings → Devices & services → Escea Fireplace → Configure** (Ethernet fires only):
+Under **Settings → Devices & services → Escea Fireplace → Configure**:
 
 | Option | Default | What it does |
 |---|---|---|
-| Read the fire's web page | On | Timers, clock and diagnostics. Turn it off if the web page gives you trouble; control carries on over UDP. |
-| Minutes between reads | 10 | 5 to 60. The web server is fragile, so keep this at 10 unless you have a reason. |
+| Maximum run time | 0 (off) | All fires. Turns the fire off once it has been on for this many hours (1 to 12). It only ever turns the fire off. |
+| Read the fire's web page (Ethernet fires) | On | Timers, clock and diagnostics. Turn it off if the web page gives you trouble; control carries on over UDP. |
+| Minutes between reads (Ethernet fires) | 10 | 5 to 60. The web server is fragile, so keep this at 10 unless you have a reason. |
 
 When adding an Ethernet fire you may be asked for the **web page login** (username and password). It's usually the serial number and PIN, tried for you. Leave the password blank to skip it. To add or change it later, open the fireplace's **⋮ → Reconfigure** and enter the password (leave it blank to keep the current one).
 
 The fire's web page is slow, often 10 to 20 seconds a page. If it doesn't answer while you're adding the fire, the login is saved anyway and checked on the first read; if it's wrong, Home Assistant asks you to fix it.
+
+### How the maximum run time counts
+
+- The count starts when Home Assistant sees the fire on, and stops when it sees it off. Turning the fire off and on again starts a fresh count.
+- Nothing is saved over a restart. Home Assistant can't tell whether someone relit the fire while it was down, so a fire that's on when Home Assistant starts is counted from then. After a restart the fire can run longer than the limit, but it's never turned off early.
+- When it acts, it logs a warning and fires an `escea_fireplace_auto_off` event with the fire's `name`, `entry_id` and `hours`. If the fire doesn't answer, it tries again every 30 seconds.
+
+## Run hours and gas use
+
+The integration doesn't count these itself, because Home Assistant's helpers already do it from the power switch.
+
+**Run hours:** **Settings → Devices & services → Helpers → Create helper → History stats**. Name it `Fireplace run hours today`, pick `switch.escea_123456_power`, state `on`, type **Time**, and a period such as today (start `{{ today_at() }}`, end `{{ now() }}`). For a running total by month, feed it into a **Utility meter** helper.
+
+**Gas use:** Escea doesn't publish a burner rate for each model that the fire reports, so you enter your own. Find your model's gas input (MJ/h) in its manual, create a **Number** helper `input_number.fireplace_mj_per_hour`, then a **Template sensor** helper:
+
+```jinja
+{{ (states('sensor.fireplace_run_hours_today') | float(0)
+    * states('input_number.fireplace_mj_per_hour') | float(0)) | round(1) }}
+```
+
+with unit `MJ`, device class **Energy** and state class **Total increasing**. It's an estimate at full flame: the fire turns its gas down once the room is warm, so real use is lower.
 
 ## Known limitations
 

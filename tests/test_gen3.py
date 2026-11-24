@@ -243,13 +243,6 @@ async def test_dhcp_updates_wifi_fire_address(
     assert entry.data[CONF_HOST] == G3_HOST
 
 
-async def test_no_options_for_wifi_fires(
-    hass: HomeAssistant, g3_entry: MockConfigEntry
-) -> None:
-    """The web page options only apply to Ethernet fires."""
-    assert not g3_entry.supports_options
-
-
 async def test_diagnostics_hide_serial(
     hass: HomeAssistant, g3_entry: MockConfigEntry
 ) -> None:

@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import issue_registry as ir
 
+from .auto_off import async_setup_auto_off
 from .const import CONF_GENERATION, DOMAIN, GEN2, GEN3, PLATFORMS
 from .coordinator import EsceaConfigEntry, EsceaCoordinator, EsceaG3Coordinator
 from .transport import async_close_transport_if_unused
@@ -24,6 +25,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EsceaConfigEntry) -> boo
         await g3.async_config_entry_first_refresh()
         entry.runtime_data = g3
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        async_setup_auto_off(hass, entry)
         return True
 
     _check_conflicts(hass)
@@ -47,6 +49,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: EsceaConfigEntry) -> boo
     entry.runtime_data = coordinator
     entry.async_on_unload(coordinator.async_shutdown_timers)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    async_setup_auto_off(hass, entry)
     return True
 
 

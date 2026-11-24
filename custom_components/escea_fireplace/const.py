@@ -15,6 +15,7 @@ PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
     Platform.BUTTON,
     Platform.CLIMATE,
+    Platform.EVENT,
     Platform.SELECT,
     Platform.SENSOR,
     Platform.SWITCH,
@@ -31,6 +32,11 @@ CONF_PIN = "pin"
 CONF_MAC = "mac"
 CONF_WEB_ENABLED = "web_enabled"
 CONF_WEB_INTERVAL = "web_interval"
+#: Turn the fire off after this many hours of running. 0 is off.
+CONF_MAX_RUN_HOURS = "max_run_hours"
+MAX_RUN_HOURS = 12
+#: Fired on the event bus when the maximum run time turns the fire off.
+EVENT_AUTO_OFF = f"{DOMAIN}_auto_off"
 
 #: UDP status poll. The fire answers in milliseconds; 30 s keeps the remote
 #: and app changes showing up quickly without loading the controller.
