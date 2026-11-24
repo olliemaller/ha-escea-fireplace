@@ -34,9 +34,9 @@
 | | Generation 2 (Ethernet) | Generation 3 (Wi-Fi, from 2024) |
 |---|---|---|
 | How to tell | Network cable to the fire | Wi-Fi in the Escea Smartheat app; newer remote style |
-| Talks over | Escea's UDP protocol (port 3300) | Escea's NCAPI (HTTP on port 80) |
+| Talks over | Escea's UDP protocol (port 3300) | Escea's NCAPI, its Network Communication API for Wi-Fi fires (HTTP on port 80) |
 | Setup | Found automatically | Turn on **Escea NCAPI Settings** in the Smartheat app, reserve its IP address, then enter the address |
-| On/off, temperature, Boost, Flame effect | ✓ (4–30 °C) | ✓ (10–38 °C, 0.5 °C steps) |
+| On/off, temperature, Boost, Flame effect | ✓ (4-30 °C) | ✓ (10-38 °C, 0.5 °C steps) |
 | What the fire is doing (starting, igniting, heating, pilot only, shutting down, error) | | ✓ |
 | Remote seen, stored errors | | ✓ |
 | Fire's built-in timers, clock and diagnostics | ✓ | |
@@ -47,7 +47,7 @@ Both protocols come from Escea: the LAN protocol specification (v0.3, still curr
 
 | | |
 |---|---|
-| **Thermostat** | Heat or off, target temperature (4–30 °C), and **Normal**, **Boost** or **Flame effect**. Works in Apple Home through HomeKit Bridge. |
+| **Thermostat** | Heat or off, target temperature (4-30 °C on Ethernet fires, 10-38 °C in 0.5 °C steps on Wi-Fi fires), and **Normal**, **Boost** or **Flame effect**. Works in Apple Home through HomeKit Bridge. |
 | **Power switch and mode select** | For dashboards, buttons and voice assistants. |
 | **The fire's own timers** | Both daily timers: turn them on or off and change their times, straight from Home Assistant. |
 | **Diagnostics** | Gas drive, flue and room fan drive, pilot valve, thermal cut-out, controller temperature and more, from the fire's own diagnostics page. |
@@ -74,7 +74,7 @@ Both protocols come from Escea: the LAN protocol specification (v0.3, still curr
 
 ## Quick start
 
-1. **Install** from the Marketplace (Home Assistant 2026.11+) or HACS with the button above, then restart Home Assistant.
+1. **Install** from the Marketplace (Home Assistant 2026.11 and later) or HACS with the button above, then restart Home Assistant. Other ways are under [Installation](#installation). You need Home Assistant **2025.8 or later**, the minimum set in `hacs.json`.
 2. **Remove** any other Escea integration and restart again.
 3. **Add the integration.** Leave the address blank to search, or type the fire's IP address. Ethernet fires may also pop up under **Discovered**.
 
@@ -89,6 +89,37 @@ That's it for Ethernet fires. On most of them the web page login is the serial n
 
 - **Ethernet fires:** Home Assistant on the same network, or able to reach the fire on UDP 3300 (and TCP 80 for timers and diagnostics). Search only works on the same network; across VLANs, type the IP address. Your **router must answer pings** from the LAN: the fire pings its gateway every 50 seconds and restarts its network connection if there's no reply.
 - **Wi-Fi fires:** 2.4 GHz Wi-Fi, firmware 1.5.9 or later, NCAPI turned on, a DHCP reservation, and Home Assistant able to reach the fire on TCP 80.
+
+## Installation
+
+### Marketplace (Home Assistant 2026.11 and later)
+
+1. Select the **Open in the Marketplace** button above. Or go to **Settings** > **Marketplace**, select **Add from link**, enter `olliemaller/ha-escea-fireplace` and select **Add**.
+2. Open **Escea Fireplace** and select **Install**.
+
+### HACS custom repository (Home Assistant 2025.8 to 2026.10)
+
+1. In **HACS**, open the **⋮** menu > **Custom repositories**, add `https://github.com/olliemaller/ha-escea-fireplace` and choose type **Integration**.
+2. Download **Escea Fireplace**.
+3. Restart Home Assistant.
+
+### Manual
+
+1. Download `escea_fireplace.zip` from the [latest release](https://github.com/olliemaller/ha-escea-fireplace/releases/latest).
+2. Unzip it into `config/custom_components/escea_fireplace/`.
+3. Restart Home Assistant.
+
+Then add the integration as in [Quick start](#quick-start).
+
+## Tested with
+
+From what the changelog and protocol notes record:
+
+- **Home Assistant 2025.8** (the minimum) and the **latest release**, by the automated tests on every change.
+- **Ethernet (Generation 2) fires:** built to Escea's LAN protocol specification v0.3, using frames captured from real fires. The 66 second lighting window and the flame effect quirk come from earlier projects' work on real fires, and the web page login fix in 0.2.2 came from testing on a real fire.
+- **Wi-Fi (Generation 3) fires:** built to Escea's NCAPI document (640051, 2024), firmware 1.5.9 or later, and tested against a simulated fire.
+
+No list of tested models yet. If it works (or doesn't) on yours, please say so in an [issue](https://github.com/olliemaller/ha-escea-fireplace/issues/new/choose) with the model and whether it's Ethernet or Wi-Fi.
 
 ## Entities
 
@@ -109,7 +140,7 @@ That's it for Ethernet fires. On most of them the web page login is the serial n
 | Gas drive, flue fan drive, room fan drive | Sensor (diagnostic) | Ethernet fires, % |
 | Controller temperature | Sensor (diagnostic) | Ethernet fires |
 | Pilot valve, thermal cut-out | Binary sensor (diagnostic) | Ethernet fires |
-| Ready in, duct temperature, solenoid and gas valve current, ignition, B2/SV, B3, auxiliary, automation and flue fan override | Diagnostic, off by default | Ethernet fires. Turn on in the entity settings |
+| Ready in, duct temperature, solenoid and gas valve current, ignition, B2/SV, B3, auxiliary, automation and flue fan override | Diagnostic, off by default | Ethernet fires. Turn on in the entity settings. B2/SV and B3 are the names the fire's diagnostics page gives to power outputs on its controller (B2 and B3 on DL models, SV on DX models) |
 
 Mode and the thermostat's presets are on gas fires only. In flame effect mode the thermostat shows **idle** rather than heating, since flame effect is mostly for looks.
 
@@ -124,7 +155,7 @@ Mode and the thermostat's presets are on gas fires only. In flame effect mode th
 
 - **Live control and status** use the fire's UDP protocol on port 3300, polled every 30 seconds. Changes from the remote or app show up within 30 seconds.
 - **Timers, clock and diagnostics** come from the fire's web page on port 80, read every 10 minutes (change it in **Configure**, or turn it off). The web server can only handle the odd request and stops answering if pushed, so it's read gently and backed off if it struggles. If it hasn't been read for 45 minutes, those entities show unavailable rather than an old value.
-- **After it's turned on or off, the fire ignores commands for about 66 seconds** while it lights or purges. Temperature and mode changes in that time are held and sent when it's ready, as long as the fire is still on. Nothing is ever held for a fire that's been turned off, and turning on is never held.
+- **After it's turned on or off, the fire ignores commands for about 66 seconds** while it lights or purges (clears the firebox with its fan after turning off). Temperature and mode changes in that time are held and sent when it's ready, as long as the fire is still on. Nothing is ever held for a fire that's been turned off, and turning on is never held.
 - **Choosing Boost or Flame effect while the fire is off would light it** (that's how Escea fires work), so it's refused. Turn it on first; you can pick the mode straight away.
 
 ## Automations
@@ -174,7 +205,7 @@ Under **Settings → Devices & services → Escea Fireplace → Configure** (Eth
 
 When adding an Ethernet fire you may be asked for the **web page login** (username and password). It's usually the serial number and PIN, tried for you. Leave the password blank to skip it. To add or change it later, open the fireplace's **⋮ → Reconfigure** and enter the password (leave it blank to keep the current one).
 
-The fire's web page is slow, often 10–20 seconds a page. If it doesn't answer while you're adding the fire, the login is saved anyway and checked on the first read; if it's wrong, Home Assistant asks you to fix it.
+The fire's web page is slow, often 10 to 20 seconds a page. If it doesn't answer while you're adding the fire, the login is saved anyway and checked on the first read; if it's wrong, Home Assistant asks you to fix it.
 
 ## Known limitations
 
@@ -184,6 +215,7 @@ The fire's web page is slow, often 10–20 seconds a page. If it doesn't answer 
 - Fan boost and flame effect are on gas fires only.
 - The fire's clock can't be set from Home Assistant. If it drifts, a Repairs issue says so; set it on the remote.
 
+## Troubleshooting
 
 | Problem | Try |
 |---|---|
@@ -194,7 +226,28 @@ The fire's web page is slow, often 10–20 seconds a page. If it doesn't answer 
 | Timers and diagnostics unavailable | Open `http://<fire's IP>` in a browser. If it doesn't load, turn the fire off at the wall for a minute. |
 | Fire never gets an IP address | A known controller fault: power cycle it. If it recurs, set your DHCP server to broadcast its offers to the fire's MAC address. |
 
-Turn on debug logging for `custom_components.escea_fireplace` and `aioescea`, and attach a diagnostics download to any issue.
+### Debug logging
+
+The quickest way: go to **Settings** > **Devices & services** > **Escea Fireplace**, open the **⋮** menu and select **Enable debug logging**. Make the problem happen, then select **Disable debug logging**; Home Assistant downloads the log.
+
+To keep it on across restarts, add this to `configuration.yaml` and restart:
+
+```yaml
+logger:
+  logs:
+    custom_components.escea_fireplace: debug
+    aioescea: debug
+```
+
+### Diagnostics
+
+Go to **Settings** > **Devices & services** > **Escea Fireplace**, open the **⋮** menu on the fire and select **Download diagnostics**. The web page login, PIN and serial number are removed. Attach it, with a debug log, to any [bug report](https://github.com/olliemaller/ha-escea-fireplace/issues/new/choose).
+
+## Help and contributing
+
+- Something not working? Check [Troubleshooting](#troubleshooting), then [open an issue](https://github.com/olliemaller/ha-escea-fireplace/issues/new/choose).
+- Found a security problem? Report it privately; see the [security policy](https://github.com/olliemaller/ha-escea-fireplace/blob/main/SECURITY.md).
+- Want to help? Read [CONTRIBUTING](https://github.com/olliemaller/ha-escea-fireplace/blob/main/CONTRIBUTING.md).
 
 ## Removing the integration
 

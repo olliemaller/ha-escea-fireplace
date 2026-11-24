@@ -14,7 +14,7 @@ jobs:
   hassfest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: home-assistant/actions/hassfest@master
 
   # The Marketplace catalogue only accepts a clean run: no ignored checks.
@@ -40,21 +40,20 @@ jobs:
             python: "3.14"
             install: pytest-homeassistant-custom-component
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
       - run: pip install ${{ matrix.install }} ruff mypy pytest-cov
       - name: Install the integration's requirements
-        # Falls back to the library's main branch if this version isn't on
-        # PyPI yet (while a library release is being prepared).
+        # No fallback: if the pinned aioescea isn't on PyPI, this fails, because
+        # Home Assistant couldn't install it either.
         run: |
           reqs=$(python -c "import json;print(' '.join(json.load(open('custom_components/escea_fireplace/manifest.json'))['requirements']))")
-          pip install $reqs || pip install "git+https://github.com/olliemaller/aioescea@main"
+          pip install $reqs
       - run: ruff check custom_components tests
       - run: ruff format --check custom_components tests
       - name: Type check
         if: matrix.ha == 'latest'
         run: mypy --strict --implicit-reexport --ignore-missing-imports custom_components/escea_fireplace
-      # The tests run a fake fire on 127.0.0.2, which Linux routes to loopback.
       - run: pytest -q --cov=custom_components.escea_fireplace --cov-report=term-missing --cov-fail-under=95

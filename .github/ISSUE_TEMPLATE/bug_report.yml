@@ -1,0 +1,33 @@
+name: Bug report
+description: Something isn't working
+labels: [bug]
+body:
+  - type: input
+    id: ha
+    attributes: {label: Home Assistant version, placeholder: "2026.10.4"}
+    validations: {required: true}
+  - type: input
+    id: version
+    attributes: {label: Integration version, placeholder: "0.2.3"}
+    validations: {required: true}
+  - type: dropdown
+    id: generation
+    attributes:
+      label: Which fire?
+      options:
+        - Ethernet (Generation 2)
+        - Wi-Fi (Generation 3)
+        - Not sure
+    validations: {required: true}
+  - type: input
+    id: model
+    attributes: {label: Fire model, if you know it}
+  - type: textarea
+    id: what
+    attributes: {label: "What happened, and what did you expect?"}
+    validations: {required: true}
+  - type: textarea
+    id: diag
+    attributes:
+      label: Diagnostics and logs
+      description: Attach diagnostics from the integration's ⋮ menu (the login, PIN and serial number are removed) and a debug log. The README's Troubleshooting section shows how.

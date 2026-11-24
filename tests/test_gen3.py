@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from aioescea import EsceaConnectionError
+from aioescea import EsceaConnectionError, FireMode
 import aiohttp
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -149,6 +149,23 @@ async def test_control(
 async def test_mode_while_off_refused(
     hass: HomeAssistant, g3_entry: MockConfigEntry, fake_g3: FakeG3
 ) -> None:
+    with pytest.raises(ServiceValidationError):
+        await hass.services.async_call(
+            "select",
+            "select_option",
+            {ATTR_ENTITY_ID: MODE, "option": "boost"},
+            blocking=True,
+        )
+    assert fake_g3.posts == []
+
+
+async def test_mode_reads_fire_before_guard(
+    hass: HomeAssistant, g3_entry: MockConfigEntry, fake_g3: FakeG3
+) -> None:
+    """The off check reads the fire now, not the last poll."""
+    fake_g3.state["state"] = "heating"
+    await g3_entry.runtime_data.async_refresh()
+    fake_g3.state["state"] = "off"  # turned off since the last poll
     with pytest.raises(ServiceValidationError):
         await hass.services.async_call(
             "select",
@@ -309,6 +326,8 @@ async def test_wifi_errors(
     with patch.object(
         coordinator.client, "async_get_status", side_effect=EsceaConnectionError("x")
     ):
+        with pytest.raises(HomeAssistantError):
+            await coordinator.async_set_mode(FireMode.BOOST)
         await coordinator.async_refresh()
         await hass.async_block_till_done()
     assert hass.states.get(CLIMATE).state == STATE_UNAVAILABLE
