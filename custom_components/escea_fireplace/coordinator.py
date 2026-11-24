@@ -35,7 +35,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers import (
+    device_registry as dr,
+    issue_registry as ir,
+)
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -250,6 +253,13 @@ class EsceaCoordinator(DataUpdateCoordinator[EsceaData]):
         self.hass.config_entries.async_update_entry(
             self.config_entry, data={**self.config_entry.data, CONF_HOST: host}
         )
+        # The entry isn't reloaded, so the device's link to the web page
+        # would keep the old address.
+        registry = dr.async_get(self.hass)
+        for device in dr.async_entries_for_config_entry(
+            registry, self.config_entry.entry_id
+        ):
+            registry.async_update_device(device.id, configuration_url=f"http://{host}/")
 
     def _web_is_fresh(self) -> bool:
         return (
@@ -334,9 +344,9 @@ class EsceaCoordinator(DataUpdateCoordinator[EsceaData]):
 
     # Commands ---------------------------------------------------------------
 
-    async def _async_command(self, action: Callable[[], Awaitable[None]]) -> None:
+    async def _async_command[T](self, action: Callable[[], Awaitable[T]]) -> T:
         try:
-            await action()
+            return await action()
         except EsceaStateError as err:
             raise ServiceValidationError(
                 translation_domain=DOMAIN,
@@ -439,10 +449,16 @@ class EsceaCoordinator(DataUpdateCoordinator[EsceaData]):
             raise ServiceValidationError(
                 translation_domain=DOMAIN, translation_key="web_unavailable"
             )
-        status = await self.fireplace.async_get_status()
+        status = await self._async_command(self.fireplace.async_get_status)
+
+        async def read_power() -> bool:
+            return (await self.fireplace.async_get_status()).is_on
+
+        # The library reads both timers fresh and checks the power again
+        # right before sending, because the form also switches the fire.
         try:
             self._home_page = await self.web.async_set_timer(
-                timer, fire_is_on=status.is_on, current=self._home_page.timers
+                timer, fire_is_on=status.is_on, read_power=read_power
             )
         except EsceaAuthError as err:
             self.config_entry.async_start_reauth(self.hass)
@@ -540,10 +556,21 @@ class EsceaG3Coordinator(DataUpdateCoordinator[EsceaData]):
 
     async def async_set_mode(self, mode: FireMode) -> None:
         """Set normal, boost or flame effect. Refused while off."""
-        if self.data and not self.data.status.is_on and mode is not FireMode.NORMAL:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN, translation_key="mode_while_off"
-            )
+        if mode is not FireMode.NORMAL:
+            # Read the fire now, not the last poll: it may have been turned
+            # off since, and boost or flame effect would then light it.
+            try:
+                status = await self.client.async_get_status()
+            except EsceaError as err:
+                raise HomeAssistantError(
+                    translation_domain=DOMAIN,
+                    translation_key="ncapi_failed",
+                    translation_placeholders={"error": str(err)},
+                ) from err
+            if not status.is_on:
+                raise ServiceValidationError(
+                    translation_domain=DOMAIN, translation_key="mode_while_off"
+                )
         if mode is FireMode.BOOST:
             await self._async_set(fan_boost=True)
         elif mode is FireMode.FLAME_EFFECT:

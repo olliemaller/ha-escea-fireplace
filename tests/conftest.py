@@ -31,7 +31,7 @@ from homeassistant.core import HomeAssistant
 
 from .fake_fire import FakeFire
 
-FIRE_HOST = "127.0.0.2"
+FIRE_HOST = "127.0.0.1"
 SERIAL = 123456
 PIN = 1234
 TOKEN = "0123456789abcdef0123456789abcdef"
@@ -47,21 +47,56 @@ def _sockets(socket_enabled: None) -> None:
     """The fake fire uses real UDP sockets on loopback."""
 
 
-@pytest.fixture
-def udp_port() -> int:
-    """A free UDP port standing in for 3300."""
+def _free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
         sock.bind(("127.0.0.1", 0))
         return int(sock.getsockname()[1])
 
 
+class LoopbackTransport(EsceaTransport):
+    """A transport that sends to the fake fire's own port.
+
+    Real fires use port 3300 at both ends. Here the fire and Home Assistant
+    share 127.0.0.1 (the only loopback address macOS routes), so they need
+    different ports.
+    """
+
+    def __init__(self, *, fire_port: int, port: int, bind_address: str) -> None:
+        super().__init__(port=port, bind_address=bind_address)
+        self.fire_port = fire_port
+
+    def _send(self, frame: bytes, host: str) -> None:
+        if self._transport is None or self._transport.is_closing():
+            raise EsceaConnectionError("UDP socket is not open")
+        self._transport.sendto(frame, (host, self.fire_port))
+
+
+@pytest.fixture
+def udp_port() -> int:
+    """A free UDP port standing in for 3300 on Home Assistant's side."""
+    return _free_port()
+
+
+@pytest.fixture
+def fire_port() -> int:
+    """A free UDP port standing in for 3300 on the fire."""
+    return _free_port()
+
+
 @pytest.fixture(autouse=True)
-async def patch_network(hass: HomeAssistant, udp_port: int) -> AsyncIterator[None]:
+async def patch_network(
+    hass: HomeAssistant, udp_port: int, fire_port: int
+) -> AsyncIterator[None]:
     """Bind the integration's socket to loopback and broadcast to the fake fire."""
     with (
         patch(
             "custom_components.escea_fireplace.transport.EsceaTransport",
-            functools.partial(EsceaTransport, port=udp_port, bind_address="127.0.0.1"),
+            functools.partial(
+                LoopbackTransport,
+                port=udp_port,
+                bind_address="127.0.0.1",
+                fire_port=fire_port,
+            ),
         ),
         patch(
             "custom_components.escea_fireplace.transport.async_broadcast_addresses",
@@ -81,14 +116,14 @@ async def patch_network(hass: HomeAssistant, udp_port: int) -> AsyncIterator[Non
 
 
 @pytest.fixture
-async def fake_fire(udp_port: int) -> AsyncIterator[FakeFire]:
-    """A fake fire on 127.0.0.2."""
+async def fake_fire(udp_port: int, fire_port: int) -> AsyncIterator[FakeFire]:
+    """A fake fire on 127.0.0.1:<fire_port>."""
     loop = asyncio.get_running_loop()
     fire = FakeFire(reply_port=udp_port)
     fire.state.serial = SERIAL
     fire.state.pin = PIN
     transport, _ = await loop.create_datagram_endpoint(
-        lambda: fire, local_addr=(FIRE_HOST, udp_port)
+        lambda: fire, local_addr=(FIRE_HOST, fire_port)
     )
     yield fire
     transport.close()

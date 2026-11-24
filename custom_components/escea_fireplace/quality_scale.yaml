@@ -26,7 +26,9 @@ rules:
     status: exempt
     comment: No custom conditions.
   docs-high-level-description: done
-  docs-installation-instructions: done
+  docs-installation-instructions:
+    status: done
+    comment: "README: Quick start, plus Installation for the Marketplace, a HACS custom repository and a manual install, with the minimum Home Assistant version."
   docs-removal-instructions: done
   docs-triggers:
     status: exempt
@@ -69,10 +71,16 @@ rules:
   docs-data-update: done
   docs-examples: done
   docs-known-limitations: done
-  docs-supported-devices: done
+  docs-supported-devices:
+    status: done
+    comment: "README: Which fires? (Ethernet and Wi-Fi generations, what each supports) and Tested with. No per-model list yet; the README says so and asks for reports."
   docs-supported-functions: done
-  docs-troubleshooting: done
-  docs-use-cases: done
+  docs-troubleshooting:
+    status: done
+    comment: "README: Troubleshooting table, debug logging (UI button and logger YAML) and diagnostics download."
+  docs-use-cases:
+    status: done
+    comment: "README: What you get and Automations (warm the room on arrival, turn off when everyone leaves)."
   dynamic-devices:
     status: exempt
     comment: One fire per config entry; there are no child devices to appear later.

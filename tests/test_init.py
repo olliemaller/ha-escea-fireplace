@@ -39,9 +39,12 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import issue_registry as ir
+from homeassistant.helpers import (
+    device_registry as dr,
+    issue_registry as ir,
+)
 
-from .conftest import SERIAL, FakeWeb
+from .conftest import FIRE_HOST, SERIAL, FakeWeb
 from .fake_fire import FakeFire
 
 CLIMATE = f"climate.escea_{SERIAL}"
@@ -233,6 +236,59 @@ async def test_timer(
     assert hass.states.get(TIMER1).state == STATE_OFF
 
 
+async def test_timer_save_never_relights(
+    hass: HomeAssistant, loaded: MockConfigEntry, fake_fire: FakeFire, fake_web: FakeWeb
+) -> None:
+    """A fire turned off while the save logs in is not turned back on."""
+    fake_fire.state.is_on = True
+    await _refresh(hass, loaded)
+    loaded.runtime_data.web._token = None  # the save has to log in first
+    handle = fake_web.handle
+
+    async def slow_login(method, url, data):  # type: ignore[no-untyped-def]
+        if url.path == "/doLogin.html":
+            fake_fire.state.is_on = False  # turned off with the remote meanwhile
+        return await handle(method, url, data)
+
+    with (
+        patch.object(fake_web, "handle", slow_login),
+        pytest.raises(HomeAssistantError, match="turned off"),
+    ):
+        await hass.services.async_call(
+            "switch", SERVICE_TURN_OFF, {ATTR_ENTITY_ID: TIMER1}, blocking=True
+        )
+    assert fake_web.saves == []
+    assert not fake_fire.state.is_on
+
+
+async def test_timer_keeps_app_changes(
+    hass: HomeAssistant, loaded: MockConfigEntry, fake_web: FakeWeb
+) -> None:
+    """The other timer is read fresh, so a change made in the app survives."""
+    fake_web.timers[2] = ["17:00", "23:00", True]  # changed in the app
+    await hass.services.async_call(
+        "time",
+        "set_value",
+        {ATTR_ENTITY_ID: TIMER1_ON, "time": "06:30:00"},
+        blocking=True,
+    )
+    assert fake_web.timers[2] == ["17:00", "23:00", True]
+    assert fake_web.timers[1][0] == "06:30"
+
+
+async def test_timer_fire_unreachable(
+    hass: HomeAssistant, loaded: MockConfigEntry, fake_fire: FakeFire, fake_web: FakeWeb
+) -> None:
+    """An unreachable fire gives the translated error, not a raw one."""
+    fake_fire.drop = 100
+    with pytest.raises(HomeAssistantError) as err:
+        await hass.services.async_call(
+            "switch", SERVICE_TURN_OFF, {ATTR_ENTITY_ID: TIMER1}, blocking=True
+        )
+    assert err.value.translation_key == "unreachable"
+    assert fake_web.saves == []
+
+
 async def test_web_down_keeps_control(
     hass: HomeAssistant,
     loaded: MockConfigEntry,
@@ -294,9 +350,14 @@ async def test_rediscovers_new_address(
     """After repeated failures it searches by serial and saves the new address."""
     coordinator = loaded.runtime_data
     coordinator.fireplace.host = "127.0.0.3"  # pretend the lease moved
+    registry = dr.async_get(hass)
+    (device,) = dr.async_entries_for_config_entry(registry, loaded.entry_id)
+    registry.async_update_device(device.id, configuration_url="http://127.0.0.3/")
     for _ in range(3):
         await _refresh(hass, loaded)
-    assert loaded.data[CONF_HOST] == "127.0.0.2"
+    assert loaded.data[CONF_HOST] == FIRE_HOST
+    device = registry.async_get(device.id)
+    assert device.configuration_url == f"http://{FIRE_HOST}/"
     await _refresh(hass, loaded)
     assert hass.states.get(CLIMATE).state == HVACMode.OFF
 

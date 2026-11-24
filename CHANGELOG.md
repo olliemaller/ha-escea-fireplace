@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.3
+
+Released 24 November 2026. Needs aioescea 0.1.4.
+
+**Fixed**
+
+- Saving a timer could turn the fire back on. The timer form on the fire's web page also carries its power switch, and the power was read once, before a web login that can take a minute. If the fire was turned off in that time, the save turned it back on. The power is now read again right before the form is sent (and again before a resend after an expired login), and if the fire was turned on or off since the save started, nothing is sent and you get an error asking you to try again.
+- Saving one timer could undo a change made to the other in the Escea app, because the other timer came from a reading up to 45 minutes old. Both timers are now read fresh as part of the save.
+- On Wi-Fi fires, choosing Boost or Flame effect checks whether the fire is on by asking it, not from the last 30 second poll, since either would light a fire that had been turned off since.
+- Saving a timer while the fire can't be reached gives the usual "didn't answer" message instead of a raw error.
+- After the fire moves to a new IP address, the device page's link to its web page follows it.
+
+**Docs**
+
+- The temperature range is right for Wi-Fi fires (10-38 °C). New sections for installing through HACS or by hand, debug logging, diagnostics, troubleshooting, what it's been tested with, and getting help. New security policy, contributing guide and bug report form.
+
+**Other**
+
+- The tests run on macOS too, and the checks fail if the pinned aioescea isn't on PyPI instead of quietly testing its unreleased main branch.
+
 ## 0.2.2
 
 **Fixed**
@@ -63,7 +83,7 @@ Fixes, and needs aioescea 0.1.1.
 
 First release. A rebuild of [snikch/climate.escea](https://github.com/snikch/climate.escea) on the new [aioescea](https://github.com/olliemaller/aioescea) library.
 
-- **Generation 3 Wi-Fi fires** through Escea's NCAPI: on/off, temperature (10–38 °C), Boost and Flame effect, plus what the fire is doing (starting, igniting, heating, pilot only, shutting down, error), whether it can hear its remote, and stored errors.
+- **Generation 3 Wi-Fi fires** through Escea's NCAPI: on/off, temperature (10-38 °C), Boost and Flame effect, plus what the fire is doing (starting, igniting, heating, pilot only, shutting down, error), whether it can hear its remote, and stored errors.
 - Set up from the UI: search every network, type an address, or accept a fire found when it joins the network (DHCP, MAC `AC:DE:48`).
 - Thermostat with Normal, Boost and Flame effect presets, plus a power switch, mode select and room temperature sensor.
 - The fire's two built-in timers, as switches and times you can change.
