@@ -29,5 +29,5 @@
   "requirements": [
     "aioescea==0.1.4"
   ],
-  "version": "0.2.3"
+  "version": "0.3.0"
 }

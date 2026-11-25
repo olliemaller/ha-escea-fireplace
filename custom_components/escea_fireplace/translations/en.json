@@ -66,13 +66,15 @@
   "options": {
     "step": {
       "init": {
-        "title": "Web page",
-        "description": "The fireplace's web page has its timers, clock and diagnostics. It can only handle the odd request, so it's read every few minutes at most.",
+        "title": "Options",
+        "description": "The maximum run time turns the fire off once it has been on for that many hours. For Ethernet fires, the web page has the timers, clock and diagnostics. It can only handle the odd request, so it's read every few minutes at most.",
         "data": {
+          "max_run_hours": "Maximum run time",
           "web_enabled": "Read the web page",
           "web_interval": "How often"
         },
         "data_description": {
+          "max_run_hours": "Turn the fire off after it has been on for this many hours (1 to 12). 0 turns this off. The count starts again whenever the fire is turned off and on, and after Home Assistant restarts.",
           "web_enabled": "Turn off to use control over UDP only. The timer and diagnostic entities are removed.",
           "web_interval": "Minutes between reads. Leave it at 10 unless you have a reason."
         }
@@ -88,6 +90,19 @@
               "normal": "Normal",
               "boost": "Boost",
               "flame_effect": "Flame effect"
+            }
+          }
+        }
+      }
+    },
+    "event": {
+      "fault": {
+        "name": "Fault",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "ignition_failed": "Lighting failed",
+              "fault": "Fault"
             }
           }
         }

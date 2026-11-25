@@ -37,6 +37,7 @@ from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 from .const import (
     CONF_GENERATION,
     CONF_MAC,
+    CONF_MAX_RUN_HOURS,
     CONF_PIN,
     CONF_SERIAL,
     CONF_WEB_ENABLED,
@@ -46,6 +47,7 @@ from .const import (
     GEN2,
     GEN3,
     LOGGER,
+    MAX_RUN_HOURS,
     MAX_WEB_INTERVAL_MINUTES,
     MIN_WEB_INTERVAL_MINUTES,
     NCAPI_PROBE_TIMEOUT,
@@ -78,12 +80,6 @@ class EsceaConfigFlow(ConfigFlow, domain=DOMAIN):
     def async_get_options_flow(entry: EsceaConfigEntry) -> EsceaOptionsFlow:
         """Return the options flow."""
         return EsceaOptionsFlow()
-
-    @classmethod
-    @callback
-    def async_supports_options_flow(cls, entry: EsceaConfigEntry) -> bool:
-        """Only Ethernet fires have a web page to configure."""
-        return bool(entry.data.get(CONF_GENERATION, GEN2) == GEN2)
 
     # Adding by hand -------------------------------------------------------
 
@@ -441,7 +437,7 @@ class EsceaConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class EsceaOptionsFlow(OptionsFlowWithReload):
-    """Choose whether and how often to read the fire's web page."""
+    """The maximum run time, and for Ethernet fires, the web page."""
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -450,27 +446,39 @@ class EsceaOptionsFlow(OptionsFlowWithReload):
         if user_input is not None:
             return self.async_create_entry(data=user_input)
         options = self.config_entry.options
-        return self.async_show_form(
-            step_id="init",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(
-                        CONF_WEB_ENABLED, default=options.get(CONF_WEB_ENABLED, True)
-                    ): bool,
-                    vol.Required(
-                        CONF_WEB_INTERVAL,
-                        default=options.get(
-                            CONF_WEB_INTERVAL, DEFAULT_WEB_INTERVAL_MINUTES
-                        ),
-                    ): selector.NumberSelector(
-                        selector.NumberSelectorConfig(
-                            min=MIN_WEB_INTERVAL_MINUTES,
-                            max=MAX_WEB_INTERVAL_MINUTES,
-                            step=1,
-                            unit_of_measurement="min",
-                            mode=selector.NumberSelectorMode.BOX,
-                        )
-                    ),
-                }
+        schema: dict[Any, Any] = {
+            vol.Required(
+                CONF_MAX_RUN_HOURS, default=options.get(CONF_MAX_RUN_HOURS, 0)
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0,
+                    max=MAX_RUN_HOURS,
+                    step=1,
+                    unit_of_measurement="h",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
             ),
-        )
+        }
+        if self.config_entry.data.get(CONF_GENERATION, GEN2) == GEN2:
+            schema[
+                vol.Required(
+                    CONF_WEB_ENABLED, default=options.get(CONF_WEB_ENABLED, True)
+                )
+            ] = bool
+            schema[
+                vol.Required(
+                    CONF_WEB_INTERVAL,
+                    default=options.get(
+                        CONF_WEB_INTERVAL, DEFAULT_WEB_INTERVAL_MINUTES
+                    ),
+                )
+            ] = selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=MIN_WEB_INTERVAL_MINUTES,
+                    max=MAX_WEB_INTERVAL_MINUTES,
+                    step=1,
+                    unit_of_measurement="min",
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            )
+        return self.async_show_form(step_id="init", data_schema=vol.Schema(schema))

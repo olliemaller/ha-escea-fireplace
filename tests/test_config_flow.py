@@ -10,6 +10,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.escea_fireplace.const import (
     CONF_MAC,
+    CONF_MAX_RUN_HOURS,
     CONF_PIN,
     CONF_SERIAL,
     CONF_WEB_ENABLED,
@@ -219,11 +220,16 @@ async def test_reauth(
 
 
 async def test_options(hass: HomeAssistant, entry: MockConfigEntry) -> None:
-    """Web page options."""
+    """Maximum run time and web page options."""
     entry.add_to_hass(hass)
     result = await hass.config_entries.options.async_init(entry.entry_id)
     result = await hass.config_entries.options.async_configure(
-        result["flow_id"], {CONF_WEB_ENABLED: False, CONF_WEB_INTERVAL: 15}
+        result["flow_id"],
+        {CONF_MAX_RUN_HOURS: 3, CONF_WEB_ENABLED: False, CONF_WEB_INTERVAL: 15},
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert entry.options == {CONF_WEB_ENABLED: False, CONF_WEB_INTERVAL: 15}
+    assert entry.options == {
+        CONF_MAX_RUN_HOURS: 3,
+        CONF_WEB_ENABLED: False,
+        CONF_WEB_INTERVAL: 15,
+    }
