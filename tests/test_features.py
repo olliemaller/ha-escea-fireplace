@@ -180,7 +180,9 @@ async def test_options_for_wifi_fire(hass: HomeAssistant, fake_g3: FakeG3) -> No
 # Fault event ----------------------------------------------------------------
 
 
-async def test_fault_events(hass: HomeAssistant, fake_g3: FakeG3) -> None:
+async def test_fault_events(
+    hass: HomeAssistant, fake_g3: FakeG3, freezer: FrozenDateTimeFactory
+) -> None:
     entry = await _setup(hass)
     assert hass.states.get(FAULT).state == STATE_UNKNOWN
 
@@ -197,12 +199,14 @@ async def test_fault_events(hass: HomeAssistant, fake_g3: FakeG3) -> None:
     await _set(hass, entry, fake_g3, room_temp_deci_c=190)
     assert hass.states.get(FAULT).state == first
 
+    freezer.tick(timedelta(seconds=1))  # event state is its timestamp
     await _set(hass, entry, fake_g3, state="error")
     state = hass.states.get(FAULT)
     assert state.attributes["event_type"] == "fault"
     assert state.state != first
     second = state.state
 
+    freezer.tick(timedelta(seconds=1))  # event state is its timestamp
     await _set(hass, entry, fake_g3, state="off", errors=True)
     state = hass.states.get(FAULT)
     assert state.attributes["event_type"] == "fault"
