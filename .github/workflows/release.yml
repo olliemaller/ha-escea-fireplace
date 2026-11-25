@@ -54,6 +54,10 @@ jobs:
             echo "::error::CHANGELOG.md has no '## $version' section. Add one before bumping the version."
             exit 1
           fi
+          if grep -qi 'not released yet' notes.md; then
+            echo "::error::The '## $version' section of CHANGELOG.md still says 'Not released yet'. Change it to 'Released <date>.' before bumping the version."
+            exit 1
+          fi
 
       - name: Publish v${{ steps.check.outputs.version }}
         if: steps.check.outputs.new == 'true'

@@ -2,7 +2,7 @@
 
 ## 0.3.0
 
-Not released yet. Needs aioescea 0.1.4.
+Released 25 November 2026. Needs aioescea 0.1.4.
 
 **Added**
 
