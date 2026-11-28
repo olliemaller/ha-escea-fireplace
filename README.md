@@ -7,7 +7,9 @@
   <a href="https://github.com/olliemaller/ha-escea-fireplace/releases"><img src="https://img.shields.io/github/v/release/olliemaller/ha-escea-fireplace?style=for-the-badge&color=FFFFFF&labelColor=000000" alt="Release"></a>
   <a href="https://github.com/olliemaller/ha-escea-fireplace/actions/workflows/validate.yml"><img src="https://img.shields.io/github/actions/workflow/status/olliemaller/ha-escea-fireplace/validate.yml?branch=main&style=for-the-badge&label=checks&labelColor=000000" alt="Checks"></a>
   <img src="https://img.shields.io/badge/Home%20Assistant-2025.8%2B-FFFFFF?style=for-the-badge&logo=homeassistant&logoColor=white&labelColor=000000" alt="Home Assistant 2025.8+">
-  <a href="https://github.com/olliemaller/ha-escea-fireplace/blob/main/LICENSE"><img src="https://img.shields.io/github/license/olliemaller/ha-escea-fireplace?style=for-the-badge&color=FFFFFF&labelColor=000000" alt="Licence"></a>
+  <a href="https://github.com/olliemaller/ha-escea-fireplace/blob/main/LICENSE"><img src="https://img.shields.io/github/license/olliemaller/ha-escea-fireplace?style=for-the-badge&label=licence&color=FFFFFF&labelColor=000000" alt="Licence"></a>
+  <a href="https://maller.com.au/projects/escea-fireplace/"><img src="https://img.shields.io/badge/Read-the%20write--up-FFFFFF?style=for-the-badge&labelColor=000000" alt="Read the write-up"></a>
+  <a href="https://maller.com.au/"><img src="https://img.shields.io/badge/Site-maller.com.au-FFFFFF?style=for-the-badge&labelColor=000000" alt="maller.com.au"></a>
 </p>
 
 <p align="center">
